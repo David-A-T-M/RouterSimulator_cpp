@@ -1,0 +1,22 @@
+name: "Style & Static Analysis"
+description: "Verifica el formato del código y busca errores lógicos"
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Clang-Format Check"
+      shell: bash
+      run: |
+        find src include -name "*.cpp" -o -name "*.h" -o -name "*.hpp" | xargs clang-format -n --Werror
+
+    - name: "Cppcheck (Static Analysis)"
+      shell: bash
+      run: |
+        cppcheck --enable=all --suppress=missingIncludeSystem --error-exitcode=1 src/ include/
+
+    - name: "Upload Error Log if failed"
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: style-analysis-report
+        path: .

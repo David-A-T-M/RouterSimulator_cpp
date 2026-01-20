@@ -1,0 +1,19 @@
+name: "Build & Test"
+description: "Build the project and run unit tests"
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Configure CMake"
+      shell: bash
+      run: cmake -S . -B build
+
+    - name: "Build"
+      shell: bash
+      run: cmake --build build
+
+    - name: "Run Unit Tests"
+      shell: bash
+      run: |
+        cd build
+        ctest --output-on-failure

@@ -1,0 +1,26 @@
+name: "Doc check"
+description: "Generate Documentation Check"
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Run Doxygen"
+      shell: bash
+      run: |
+        doxygen Doxyfile 2> doxygen_warnings.txt
+        
+        if [ -s doxygen_warnings.txt ]; then
+            echo "Error: Hay elementos sin documentar o errores en Doxyfile."
+            cat doxygen_warnings.txt
+            exit 1
+        else
+            echo "Documentación perfecta!"
+            exit 0
+        fi
+
+    - name: "Upload Doc Errors"
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: Doxygen-Warnings
+        path: doxygen_warnings.txt

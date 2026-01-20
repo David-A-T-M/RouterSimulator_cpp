@@ -1,0 +1,39 @@
+name: Routers Simulator CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+jobs:
+  # JOB 1: Style
+  style-and-static-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Linting Tools
+        run: sudo apt-get update && sudo apt-get install -y clang-format cppcheck
+      - name: Run Style Check
+        uses: ./.github/actions/style
+
+  # JOB 2: Build and Test
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: Install Build Tools
+        run: sudo apt-get update && sudo apt-get install -y cmake build-essential libgtest-dev
+      - name: Build Project
+        uses: ./.github/actions/building
+
+  # JOB 3: Documentation Check
+  documentation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Doxygen
+        run: sudo apt-get update && sudo apt-get install -y doxygen graphviz
+      - name: Run Documentation Check
+        uses: ./.github/actions/documentation
