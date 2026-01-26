@@ -1,6 +1,8 @@
 name: Routers Simulator CI
 
 on:
+  push:
+    branches: [ main, dev, 'feature/**' ]
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
@@ -20,11 +22,11 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - name: Install Build Tools
-        run: sudo apt-get update && sudo apt-get install -y cmake build-essential libgtest-dev
+      - name: Install GoogleTest
+        run: sudo apt-get install -y libgtest-dev
       - name: Build Project
         uses: ./.github/actions/building
 
