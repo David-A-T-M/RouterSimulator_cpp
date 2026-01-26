@@ -12,7 +12,7 @@ runs:
     - name: "Cppcheck (Static Analysis)"
       shell: bash
       run: |
-        cppcheck --enable=all --suppress=missingIncludeSystem --error-exitcode=1 src/ include/
+        cppcheck --enable=all --inline-suppr --suppress=unmatchedSuppression --error-exitcode=1 src/ include/
 
     - name: "Upload Error Log if failed"
       uses: actions/upload-artifact@v4
