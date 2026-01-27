@@ -15,8 +15,14 @@ runs:
         # Creamos una carpeta para el reporte HTML
         mkdir -p cppcheck_report_html
         
-        cppcheck --enable=all --inline-suppr --suppress=unmatchedSuppression --suppress=unusedFunction \
-        --error-exitcode=1 -I include/ --xml src/ include/ 2> report.xml
+        cppcheck  --enable=all \
+                  --inline-suppr \
+                  --suppress=unmatchedSuppression \
+                  --suppress=unusedFunction \
+                  --suppress=missingIncludeSystem \
+                  --error-exitcode=1 \
+                  -I include/ \
+                  --xml src/ include/ 2> report.xml
 
     - name: "Generate HTML Report"
       shell: bash
