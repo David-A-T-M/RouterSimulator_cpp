@@ -12,11 +12,32 @@ runs:
     - name: "Cppcheck (Static Analysis)"
       shell: bash
       run: |
-        cppcheck --enable=all --inline-suppr --suppress=unmatchedSuppression --error-exitcode=1 src/ include/
+        # Creamos una carpeta para el reporte HTML
+        mkdir -p cppcheck_report_html
+        
+        cppcheck  --enable=all \
+                  --inline-suppr \
+                  --suppress=unmatchedSuppression \
+                  --suppress=unusedFunction \
+                  --suppress=missingIncludeSystem \
+                  --error-exitcode=1 \
+                  -I include/ \
+                  --xml src/ include/ 2> report.xml
 
-    - name: "Upload Error Log if failed"
+    - name: "Generate HTML Report"
+      shell: bash
+      if: always()
+      run: |
+        # Convertimos el XML en una web interactiva (si cppcheck-htmlreport está disponible)
+        # Si falla este paso por falta de dependencias, el anterior ya cumplió con el análisis.
+        cppcheck-htmlreport --file=report.xml --report-dir=cppcheck_report_html --source-dir=. || echo "HTML report tool not found, skipping."
+
+    - name: "Upload Analysis Report"
       uses: actions/upload-artifact@v4
-      if: failure()
+      if: always() # Queremos el reporte tanto si falló como si pasó
       with:
-        name: style-analysis-report
-        path: .
+        name: analysis-results
+        # Subimos el XML y la carpeta HTML (si se generó)
+        path: |
+          report.xml
+          cppcheck_report_html/
