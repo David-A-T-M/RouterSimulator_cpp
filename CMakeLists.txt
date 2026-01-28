@@ -48,3 +48,22 @@ foreach(test_file ${TEST_SOURCES})
 
     add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
+
+# --- 6. Integración de Cppcheck ---
+find_program(CPPCHECK_PATH cppcheck)
+
+add_custom_target(check
+    COMMAND ${CPPCHECK_PATH}
+            --enable=all
+            --inline-suppr
+            --suppress=unmatchedSuppression
+            --suppress=unusedFunction
+            --suppress=missingIncludeSystem
+            --suppress=functionStatic # <-- Añadimos esto para ignorar lo de end()
+            --check-level=exhaustive
+            --error-exitcode=1
+            -I ${CMAKE_SOURCE_DIR}/include
+            ${CMAKE_SOURCE_DIR}/src
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "Ejecutando Cppcheck exhaustivo..."
+)
