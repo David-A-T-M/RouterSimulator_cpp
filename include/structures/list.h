@@ -819,17 +819,23 @@ void List<T>::print() const {
 
 template <typename T>
 bool List<T>::contains(const T& val) const {
+    // cppcheck-suppress useStlAlgorithm
     for (const auto& item : *this) {
         if (item == val) {
             return true;
         }
     }
     return false;
+    /* Alternative using STL algorithm:
+    return std::any_of(this->begin(), this->end(), [&val](const T& item) {
+        return item == val;});
+    */
 }
 
 template <typename T>
 std::optional<size_t> List<T>::find(const T& val) const {
     size_t index = 0;
+    // cppcheck-suppress useStlAlgorithm
     for (const auto& item : *this) {
         if (item == val) {
             return index;
@@ -837,6 +843,13 @@ std::optional<size_t> List<T>::find(const T& val) const {
         ++index;
     }
     return std::nullopt;
+    /* Alternative using STL algorithm:
+    auto it = std::find(this->begin(), this->end(), val);
+    if (it != this->end()) {
+        return std::distance(this->begin(), it);
+    }
+    return std::nullopt;
+    */
 }
 
 // =============== Private Helpers ===============
