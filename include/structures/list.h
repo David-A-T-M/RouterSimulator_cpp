@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cstddef>
 #include <iostream>
+#include <iterator>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
@@ -36,6 +38,11 @@ public:
      */
     class Iterator {
     public:
+        using iterator_category = std::forward_iterator_tag;
+        using value_type        = T;
+        using difference_type   = std::ptrdiff_t;
+        using pointer           = T*;
+        using reference         = T&;
         /**
          * @brief Construct an iterator pointing to a node.
          * @param node Pointer to the node this iterator will reference (may be nullptr).
@@ -69,11 +76,26 @@ public:
          * @return @c true if iterators point to different nodes; otherwise @c false.
          */
         bool operator!=(const Iterator& other) const { return current != other.current; }
+
+        /**
+         * @brief Pre-increment: advance iterator to the next element.
+         * @return Reference to the advanced iterator.
+         */
         Iterator& operator++() {
             if (current) {
                 current = current->next;
             }
             return *this;
+        }
+
+        /**
+         * @brief Post-increment: advance iterator to the next element.
+         * @return Copy of the iterator before advancement.
+         */
+        Iterator operator++(int) {
+            Iterator temp = *this;
+            ++(*this);
+            return temp;
         }
 
     private:
@@ -89,6 +111,11 @@ public:
      */
     class ConstIterator {
     public:
+        using iterator_category = std::forward_iterator_tag;
+        using value_type        = T;
+        using difference_type   = std::ptrdiff_t;
+        using pointer           = const T*;
+        using reference         = const T&;
         /**
          * @brief Construct a const iterator pointing to a node.
          * @param node Pointer to the node this iterator will reference (may be nullptr).
@@ -110,6 +137,13 @@ public:
         const T* operator->() const { return &(current->data); }
 
         /**
+         * @brief Compare two iterators for equality.
+         * @param other ConstIterator to compare with.
+         * @return @c true if both iterators point to the same node; otherwise @c false.
+         */
+        bool operator==(const ConstIterator& other) const { return current == other.current; }
+
+        /**
          * @brief Compare two const iterators for inequality.
          * @param other ConstIterator to compare with.
          * @return @c true if iterators point to different nodes; otherwise @c false.
@@ -125,6 +159,16 @@ public:
                 current = current->next;
             }
             return *this;
+        }
+
+        /**
+         * @brief Post-increment: advance const iterator to the next element.
+         * @return Copy of the const iterator before advancement.
+         */
+        ConstIterator operator++(int) {
+            ConstIterator temp = *this;
+            ++(*this);
+            return temp;
         }
 
     private:
