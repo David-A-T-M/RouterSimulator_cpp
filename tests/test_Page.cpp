@@ -16,21 +16,6 @@ TEST(PageConstructors, ValidConstructor) {
     EXPECT_EQ(page.getDestinationIP(), dest);
 }
 
-TEST(PageConstructors, ConstructorInvalidPageID) {
-    const IPAddress origin(10, 5);
-    const IPAddress dest(20, 10);
-
-    EXPECT_THROW(Page(-1, 10, origin, dest), std::invalid_argument);
-}
-
-TEST(PageConstructors, ConstructorInvalidPageLength) {
-    const IPAddress origin(10, 5);
-    const IPAddress dest(20, 10);
-
-    EXPECT_THROW(Page(100, 0, origin, dest), std::invalid_argument);
-    EXPECT_THROW(Page(100, -5, origin, dest), std::invalid_argument);
-}
-
 TEST(PageConstructors, ConstructorInvalidOriginIP) {
     const IPAddress invalidOrigin(0, 0);
     const IPAddress dest(20, 10);

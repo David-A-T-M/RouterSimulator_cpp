@@ -13,8 +13,8 @@
  * 2. Reassembled from received packets at the destination
  */
 class Page {
-    int pageID;              /**< Unique identifier for the page */
-    int pageLength;          /**< Page length in packets */
+    size_t pageID;              /**< Unique identifier for the page */
+    size_t pageLength;       /**< Page length in packets */
     IPAddress originIP;      /**< Sender Terminal IP */
     IPAddress destinationIP; /**< Destination Terminal IP */
 
@@ -28,7 +28,7 @@ public:
      * @param destinationIP The destination IP address for the page.
      * @throws std::invalid_argument if parameters are invalid.
      */
-    Page(int pageID, int pageLength, IPAddress originIP, IPAddress destinationIP);
+    Page(size_t pageID, size_t pageLength, IPAddress originIP, IPAddress destinationIP);
 
     /**
      * @brief Constructor that creates a Page from a list of completed packets.
@@ -73,13 +73,13 @@ public:
      * @brief Retrieves the page ID.
      * @return The unique identifier of the page.
      */
-    [[nodiscard]] int getPageID() const noexcept;
+    [[nodiscard]] size_t getPageID() const noexcept;
 
     /**
      * @brief Retrieves the length of the page in terms of the number of packets.
      * @return The number of packets in the page.
      */
-    [[nodiscard]] int getPageLength() const noexcept;
+    [[nodiscard]] size_t getPageLength() const noexcept;
 
     /**
      * @brief Retrieves the origin IP address of the page.
@@ -157,11 +157,11 @@ public:
     [[nodiscard]] bool operator<(const Page& other) const noexcept;
 };
 
-inline int Page::getPageID() const noexcept {
+inline size_t Page::getPageID() const noexcept {
     return pageID;
 }
 
-inline int Page::getPageLength() const noexcept {
+inline size_t Page::getPageLength() const noexcept {
     return pageLength;
 }
 

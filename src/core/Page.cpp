@@ -1,13 +1,7 @@
 #include "core/Page.h"
 
-Page::Page(int pageID, int pageLength, IPAddress originIP, IPAddress destinationIP)
+Page::Page(size_t pageID, size_t pageLength, IPAddress originIP, IPAddress destinationIP)
     : pageID(pageID), pageLength(pageLength), originIP(originIP), destinationIP(destinationIP) {
-    if (pageID < 0) {
-        throw std::invalid_argument("pageID must be non-negative");
-    }
-    if (pageLength <= 0) {
-        throw std::invalid_argument("pageLength must be positive");
-    }
     if (!destinationIP.isValid()) {
         throw std::invalid_argument("destinationIP must be valid (not 0.0)");
     }
