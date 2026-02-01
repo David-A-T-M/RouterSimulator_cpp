@@ -38,7 +38,7 @@ public:
      * @param mode Operation mode (FIFO or PRIORITY).
      * @param capacity Maximum buffer capacity (0 = unlimited, default).
      */
-    explicit PacketBuffer(Mode mode = Mode::FIFO, int capacity = 0);
+    explicit PacketBuffer(Mode mode = Mode::FIFO, size_t capacity = 0);
 
     /**
      * @brief Destructor

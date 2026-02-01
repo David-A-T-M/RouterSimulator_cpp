@@ -20,10 +20,6 @@ TEST(PacketBufferConstructors, ConstructorPriority) {
     EXPECT_FALSE(buffer.isFull());
 }
 
-TEST(PacketBufferConstructors, ConstructorInvalidCapacity) {
-    EXPECT_THROW(PacketBuffer(PacketBuffer::Mode::FIFO, -5), std::invalid_argument);
-}
-
 // =============== Getters ===============
 TEST(PacketBufferGetters, GetMaxPriority) {
     const IPAddress origin(10, 5);

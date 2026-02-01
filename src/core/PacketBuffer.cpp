@@ -5,11 +5,7 @@
 #include <sstream>
 
 // =============== Constructors & Destructor ===============
-PacketBuffer::PacketBuffer(Mode mode, int capacity) : mode(mode), capacity(capacity) {
-    if (capacity < 0) {
-        throw std::invalid_argument("Capacity cannot be negative");
-    }
-}
+PacketBuffer::PacketBuffer(Mode mode, size_t capacity) : mode(mode), capacity(capacity) {}
 
 // =============== Getters ===============
 int PacketBuffer::getMaxPriority() const {
