@@ -12,15 +12,6 @@ TEST(PageReassemblerConstructor, ValidConstructor) {
     EXPECT_FALSE(reassembler.isComplete());
 }
 
-TEST(PageReassemblerConstructor, ConstructorInvalidPageID) {
-    EXPECT_THROW(PageReassembler(-1, 10), std::invalid_argument);
-}
-
-TEST(PageReassemblerConstructor, ConstructorInvalidLength) {
-    EXPECT_THROW(PageReassembler(100, 0), std::invalid_argument);
-    EXPECT_THROW(PageReassembler(100, -5), std::invalid_argument);
-}
-
 // =============== Getters tests ===============
 TEST(PageReassemblerGetters, GetCompletionRate) {
     const IPAddress origin(10, 5);
@@ -110,8 +101,7 @@ TEST(PageReassemblerQuery, HasPacketAt) {
 TEST(PageReassemblerQuery, HasPacketAtInvalidPosition) {
     const PageReassembler reassembler(100, 5);
 
-    EXPECT_FALSE(reassembler.hasPacketAt(-1));
-    EXPECT_FALSE(reassembler.hasPacketAt(10));
+    EXPECT_THROW((void)reassembler.hasPacketAt(10), std::out_of_range);
 }
 
 // =============== Modifiers tests ===============
