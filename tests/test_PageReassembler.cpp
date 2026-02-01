@@ -101,7 +101,7 @@ TEST(PageReassemblerQuery, HasPacketAt) {
 TEST(PageReassemblerQuery, HasPacketAtInvalidPosition) {
     const PageReassembler reassembler(100, 5);
 
-    EXPECT_FALSE(reassembler.hasPacketAt(10));
+    EXPECT_THROW((void)reassembler.hasPacketAt(10), std::out_of_range);
 }
 
 // =============== Modifiers tests ===============

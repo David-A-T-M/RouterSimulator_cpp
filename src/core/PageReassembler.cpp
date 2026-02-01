@@ -19,7 +19,7 @@ PageReassembler::PageReassembler(PageReassembler&& other) noexcept
       currentPackets(other.currentPackets),
       packetArray(other.packetArray) {
     other.packetArray = nullptr;
-}   // TODO: test
+}  // TODO: test
 
 PageReassembler& PageReassembler::operator=(PageReassembler&& other) noexcept {
     if (this != &other) {
@@ -30,16 +30,16 @@ PageReassembler& PageReassembler::operator=(PageReassembler&& other) noexcept {
             delete[] packetArray;
         }
 
-        pageID = other.pageID;
+        pageID          = other.pageID;
         expectedPackets = other.expectedPackets;
-        currentPackets = other.currentPackets;
-        packetArray = other.packetArray;
+        currentPackets  = other.currentPackets;
+        packetArray     = other.packetArray;
 
         other.packetArray = nullptr;
     }
 
     return *this;
-}   // TODO: test
+}  // TODO: test
 
 PageReassembler::~PageReassembler() {
     if (packetArray != nullptr) {
@@ -52,6 +52,9 @@ PageReassembler::~PageReassembler() {
 
 // =============== Query methods ===============
 bool PageReassembler::hasPacketAt(size_t position) const {
+    if (position >= expectedPackets) {
+        throw std::out_of_range("Position out of range in hasPacketAt");
+    }
     return packetArray[position] != nullptr;
 }
 

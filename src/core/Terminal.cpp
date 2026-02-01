@@ -115,8 +115,7 @@ void Terminal::handleCompletedPage(PageReassembler* reassembler) {
 
     const Page completedPage(std::move(packets));
 
-    std::cout << "Terminal " << ip << " received page "
-              << completedPage.getPageID() << std::endl;
+    std::cout << "Terminal " << ip << " received page " << completedPage.getPageID() << std::endl;
 
     receivedPages++;
 
@@ -134,9 +133,7 @@ void Terminal::removeReassembler(const PageReassembler* reassembler) {
 
 std::string Terminal::toString() const {
     std::ostringstream oss;
-    oss << "Terminal{IP=" << ip
-        << ", Sent=" << sentPages
-        << ", Received=" << receivedPages
+    oss << "Terminal{IP=" << ip << ", Sent=" << sentPages << ", Received=" << receivedPages
         << ", Active=" << reassemblers.size() << "}";
     return oss.str();
 }

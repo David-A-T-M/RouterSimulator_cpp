@@ -12,10 +12,10 @@
  * received, creates an ordered List<Packet> ready to construct a Page.
  */
 struct PageReassembler {
-    size_t pageID;           /**< ID of the page being reassembled */
-    size_t expectedPackets;  /**< Total number of packets expected */
-    size_t currentPackets;   /**< Number of packets received so far */
-    Packet** packetArray; /**< Array of packet pointers indexed by position */
+    size_t pageID;          /**< ID of the page being reassembled */
+    size_t expectedPackets; /**< Total number of packets expected */
+    size_t currentPackets;  /**< Number of packets received so far */
+    Packet** packetArray;   /**< Array of packet pointers indexed by position */
 
     // =============== Constructors & Destructor ===============
     /**

@@ -13,7 +13,7 @@
  * 2. Reassembled from received packets at the destination
  */
 class Page {
-    size_t pageID;              /**< Unique identifier for the page */
+    size_t pageID;           /**< Unique identifier for the page */
     size_t pageLength;       /**< Page length in packets */
     IPAddress originIP;      /**< Sender Terminal IP */
     IPAddress destinationIP; /**< Destination Terminal IP */
