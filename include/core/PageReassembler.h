@@ -12,9 +12,9 @@
  * received, creates an ordered List<Packet> ready to construct a Page.
  */
 struct PageReassembler {
-    int pageID;           /**< ID of the page being reassembled */
-    int expectedPackets;  /**< Total number of packets expected */
-    int currentPackets;   /**< Number of packets received so far */
+    size_t pageID;           /**< ID of the page being reassembled */
+    size_t expectedPackets;  /**< Total number of packets expected */
+    size_t currentPackets;   /**< Number of packets received so far */
     Packet** packetArray; /**< Array of packet pointers indexed by position */
 
     // =============== Constructors & Destructor ===============
@@ -24,12 +24,7 @@ struct PageReassembler {
      * @param length Total number of packets in the page (must be > 0).
      * @throws std::invalid_argument if parameters are invalid.
      */
-    PageReassembler(int pageID, int length);
-
-    /**
-     * @brief Destructor - cleans up all allocated packets.
-     */
-    ~PageReassembler();
+    PageReassembler(size_t pageID, size_t length);
 
     /**
      * @brief Deleted Copy constructor.
@@ -44,12 +39,17 @@ struct PageReassembler {
     /**
      * @brief Deleted Move constructor.
      */
-    PageReassembler(PageReassembler&& other) noexcept = delete;
+    PageReassembler(PageReassembler&& other) noexcept;
 
     /**
      * @brief Deleted Move assignment operator.
      */
-    PageReassembler& operator=(PageReassembler&& other) noexcept = delete;
+    PageReassembler& operator=(PageReassembler&& other) noexcept;
+
+    /**
+     * @brief Destructor - cleans up all allocated packets.
+     */
+    ~PageReassembler();
 
     // =============== Getters ===============
     /**
@@ -62,7 +62,7 @@ struct PageReassembler {
      * @brief Gets the number of packets still needed.
      * @return expectedPackets - currentPackets.
      */
-    [[nodiscard]] int getRemainingPackets() const;
+    [[nodiscard]] size_t getRemainingPackets() const;
 
     // =============== Query methods ===============
     /**
@@ -76,7 +76,7 @@ struct PageReassembler {
      * @param position The packet position to check.
      * @return true if packet at this position has been received.
      */
-    [[nodiscard]] bool hasPacketAt(int position) const;
+    [[nodiscard]] bool hasPacketAt(size_t position) const;
 
     // =============== Modifiers ===============
     /**
@@ -105,6 +105,10 @@ struct PageReassembler {
      * @brief Resets the reassembler, deleting all stored packets.
      */
     void reset();
+
+    bool operator==(const PageReassembler& other) const noexcept;
+
+    bool operator!=(const PageReassembler& other) const noexcept;
 };
 
 // =============== Query methods ===============
@@ -119,6 +123,6 @@ inline double PageReassembler::getCompletionRate() const {
     return static_cast<double>(currentPackets) / expectedPackets;
 }
 
-inline int PageReassembler::getRemainingPackets() const {
+inline size_t PageReassembler::getRemainingPackets() const {
     return expectedPackets - currentPackets;
 }

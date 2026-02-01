@@ -1,12 +1,9 @@
 #include "core/PageReassembler.h"
 
 // =============== Constructors & Destructor ===============
-PageReassembler::PageReassembler(int id, int length)
+PageReassembler::PageReassembler(size_t id, size_t length)
     : pageID(id), expectedPackets(length), currentPackets(0), packetArray(nullptr) {
-    if (id < 0) {
-        throw std::invalid_argument("pageID must be non-negative");
-    }
-    if (length <= 0) {
+    if (length == 0) {
         throw std::invalid_argument("expectedPackets must be positive");
     }
 
@@ -15,6 +12,34 @@ PageReassembler::PageReassembler(int id, int length)
         packetArray[i] = nullptr;
     }
 }
+
+PageReassembler::PageReassembler(PageReassembler&& other) noexcept
+    : pageID(other.pageID),
+      expectedPackets(other.expectedPackets),
+      currentPackets(other.currentPackets),
+      packetArray(other.packetArray) {
+    other.packetArray = nullptr;
+}   // TODO: test
+
+PageReassembler& PageReassembler::operator=(PageReassembler&& other) noexcept {
+    if (this != &other) {
+        if (packetArray) {
+            for (int i = 0; i < expectedPackets; ++i) {
+                delete packetArray[i];
+            }
+            delete[] packetArray;
+        }
+
+        pageID = other.pageID;
+        expectedPackets = other.expectedPackets;
+        currentPackets = other.currentPackets;
+        packetArray = other.packetArray;
+
+        other.packetArray = nullptr;
+    }
+
+    return *this;
+}   // TODO: test
 
 PageReassembler::~PageReassembler() {
     if (packetArray != nullptr) {
@@ -26,10 +51,7 @@ PageReassembler::~PageReassembler() {
 }
 
 // =============== Query methods ===============
-bool PageReassembler::hasPacketAt(int position) const {
-    if (position < 0 || position >= expectedPackets) {
-        return false;
-    }
+bool PageReassembler::hasPacketAt(size_t position) const {
     return packetArray[position] != nullptr;
 }
 
@@ -89,4 +111,12 @@ void PageReassembler::reset() {
         packetArray[i] = nullptr;
     }
     currentPackets = 0;
+}
+
+bool PageReassembler::operator==(const PageReassembler& other) const noexcept {
+    return pageID == other.pageID;
+}
+
+bool PageReassembler::operator!=(const PageReassembler& other) const noexcept {
+    return !(*this == other);
 }
