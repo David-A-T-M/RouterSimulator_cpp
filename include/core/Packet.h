@@ -14,10 +14,10 @@
  * used by routers for data transmission.
  */
 class Packet {
-    int pageID;              /**< ID of the page that the packet belongs to. */
-    int pagePosition;        /**< Position of the packet in the page. */
-    int pageLength;          /**< Length of the page. */
-    int routerPriority;      /**< Priority of the packet in the router. The lower the value, the higher the priority. */
+    size_t pageID;           /**< ID of the page that the packet belongs to. */
+    size_t pagePosition;     /**< Position of the packet in the page. */
+    size_t pageLength;       /**< Length of the page. */
+    size_t routerPriority;   /**< Priority of the packet in the router. The lower the value, the higher the priority. */
     IPAddress destinationIP; /**< Reference to the destination terminal IP. */
     IPAddress originIP;      /**< Reference to the origin terminal IP. */
 
@@ -73,25 +73,25 @@ public:
      * @brief Gets the page ID.
      * @return Page ID.
      */
-    [[nodiscard]] int getPageID() const noexcept;
+    [[nodiscard]] size_t getPageID() const noexcept;
 
     /**
      * @brief Gets the position of this packet within its page.
      * @return Page position (0-based).
      */
-    [[nodiscard]] int getPagePosition() const noexcept;
+    [[nodiscard]] size_t getPagePosition() const noexcept;
 
     /**
      * @brief Gets the total length of the page this packet belongs to.
      * @return Page length.
      */
-    [[nodiscard]] int getPageLength() const noexcept;
+    [[nodiscard]] size_t getPageLength() const noexcept;
 
     /**
      * @brief Gets the router priority assigned to this packet.
      * @return Router priority. The lower the value, the higher the priority.
      */
-    [[nodiscard]] int getRouterPriority() const noexcept;
+    [[nodiscard]] size_t getRouterPriority() const noexcept;
 
     /**
      * @brief Gets the destination IP address.
@@ -175,19 +175,19 @@ inline void Packet::setRouterPriority(int priority) noexcept {
 }
 
 // =============== Getters ===============
-inline int Packet::getPageID() const noexcept {
+inline size_t Packet::getPageID() const noexcept {
     return pageID;
 }
 
-inline int Packet::getPagePosition() const noexcept {
+inline size_t Packet::getPagePosition() const noexcept {
     return pagePosition;
 }
 
-inline int Packet::getPageLength() const noexcept {
+inline size_t Packet::getPageLength() const noexcept {
     return pageLength;
 }
 
-inline int Packet::getRouterPriority() const noexcept {
+inline size_t Packet::getRouterPriority() const noexcept {
     return routerPriority;
 }
 
