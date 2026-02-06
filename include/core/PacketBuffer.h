@@ -27,9 +27,10 @@ public:
     };
 
 private:
-    List<Packet> packets; /**< Internal packet storage */
-    Mode mode;            /**< Operation mode */
-    size_t capacity;      /**< Maximum capacity (0 = unlimited) */
+    List<Packet> packets;    /**< Internal packet storage */
+    Mode mode;               /**< Operation mode */
+    size_t capacity;         /**< Maximum capacity (0 = unlimited) */
+    IPAddress destinationIP; /**< Associated router IP (for output buffers) */
 
 public:
     // =============== Constructors & Destructor ===============
@@ -39,6 +40,14 @@ public:
      * @param capacity Maximum buffer capacity (0 = unlimited, default).
      */
     explicit PacketBuffer(Mode mode = Mode::FIFO, size_t capacity = 0);
+
+    /**
+     * @brief Constructor with associated router IP.
+     * @param ip Associated router IP address.
+     * @param mode Operation mode (FIFO or PRIORITY, default PRIORITY).
+     * @param capacity Maximum buffer capacity (0 = unlimited, default).
+     */
+    explicit PacketBuffer(IPAddress ip, Mode mode = Mode::PRIORITY, size_t capacity = 0);
 
     /**
      * @brief Destructor
@@ -66,6 +75,13 @@ public:
     PacketBuffer& operator=(PacketBuffer&&) noexcept = default;
 
     // =============== Getters ===============
+    /**
+     * @brief Gets the associated destination IP.
+     * @return Destination IP address.
+     * @note A 0.0 IP indicates no specific association.
+     */
+    [[nodiscard]] IPAddress getDestinationIP() const noexcept;
+
     /**
      * @brief Gets the maximum capacity.
      * @return Capacity (0 = unlimited).
@@ -243,6 +259,10 @@ private:
 };
 
 // =============== Getters ===============
+[[nodiscard]] inline IPAddress PacketBuffer::getDestinationIP() const noexcept {
+    return destinationIP;
+}
+
 inline size_t PacketBuffer::getCapacity() const noexcept {
     return capacity;
 }
