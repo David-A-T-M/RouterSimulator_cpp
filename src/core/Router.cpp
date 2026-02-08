@@ -1,10 +1,10 @@
 #include "core/Router.h"
+
+#include <algorithm>
+
 #include "core/Terminal.h"
 
-RouterConnection::RouterConnection(Router* r) {
-    router       = r;
-    outputBuffer = PacketBuffer{r->getIP()};
-}
+RouterConnection::RouterConnection(Router* r) : router(r), outputBuffer(PacketBuffer{r->getIP()}) {}
 
 Router::Router(IPAddress routerIP, size_t inputCapacity, size_t internalBW, size_t externalBW)
     : ip(routerIP),
@@ -137,11 +137,14 @@ size_t Router::processLocalBuffer() {
 }
 
 size_t Router::getNeighborBufferUsage(IPAddress neighborIP) const {
-    for (const auto& conn : connections) {
-        if (conn.router->getIP() == neighborIP) {
-            return conn.outputBuffer.size();
-        }
+    const auto it = std::find_if(connections.begin(), connections.end(), [&neighborIP](const RouterConnection& rc) {
+        return rc.router->getIP() == neighborIP;
+    });
+
+    if (it != connections.end()) {
+        return it->outputBuffer.size();
     }
+
     return 0;
 }
 
@@ -171,7 +174,7 @@ PacketBuffer* Router::getOutputBuffer(IPAddress nextIP) {
     return nullptr;
 }
 
-bool Router::routePacket(Packet packet) {
+bool Router::routePacket(const Packet& packet) {
     IPAddress destIP = packet.getDestinationIP();
 
     if (destIP.getRouterIP() == getIP().getRouterIP()) {
@@ -198,18 +201,11 @@ bool Router::routePacket(Packet packet) {
 }
 
 bool Router::routerIsConnected(IPAddress neighborIP) const {
-    for (const auto& conn : connections) {
-        if (conn.router->getIP() == neighborIP) {
-            return true;
-        }
-    }
-    return false;
+    return std::any_of(connections.begin(), connections.end(),
+                       [&neighborIP](const RouterConnection& rc) { return rc.router->getIP() == neighborIP; });
 }
+
 bool Router::terminalIsConnected(IPAddress terminalIP) const {
-    for (const auto& terminal : terminals) {
-        if (terminal->getTerminalIP() == terminalIP) {
-            return true;
-        }
-    }
-    return false;
+    return std::any_of(terminals.begin(), terminals.end(),
+                       [&terminalIP](const auto& tp) { return tp->getTerminalIP() == terminalIP; });
 }

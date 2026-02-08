@@ -301,6 +301,7 @@ TEST(RouterProcessing, ProcessOutputBuffersBandwidthLimit) {
 TEST(RouterProcessing, ProcessLocalBufferValid) {
     Router router{IPAddress{5, 0}, 100, 10, 5};
     auto terminal = std::make_unique<Terminal>(IPAddress{5, 10}, &router);
+
     Terminal* terminalRawPtr = terminal.get();  // Keep raw pointer for later verification
     router.connectTerminal(std::move(terminal));
 
@@ -335,6 +336,7 @@ TEST(RouterProcessing, TickFullCycle) {
     Router router1{IPAddress{5, 0}};
     Router router2{IPAddress{10, 0}};
     auto terminal = std::make_unique<Terminal>(IPAddress{5, 10}, &router1);
+
     Terminal* terminalRawPtr = terminal.get();  // Keep raw pointer for later verification
 
     router1.connectTerminal(std::move(terminal));
@@ -380,5 +382,5 @@ TEST(RouterUtilities, ToString) {
     std::string str = router.toString();
 
     EXPECT_NE(str.find("Router"), std::string::npos);
-    EXPECT_NE(str.find("5"), std::string::npos);
+    EXPECT_NE(str.find('5'), std::string::npos);
 }

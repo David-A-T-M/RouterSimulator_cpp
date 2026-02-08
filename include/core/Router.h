@@ -228,21 +228,21 @@ private:
      * @brief Routes a single packet to appropriate destination.
      * @return true if routed successfully, false if dropped.
      */
-    bool routePacket(Packet packet);
+    bool routePacket(const Packet& packet);
 
     /**
      * @brief Checks if a router with given IP is already connected.
      * @param neighborIP IP address of the neighbor router.
      * @return true if connected, false otherwise.
      */
-    bool routerIsConnected(IPAddress neighborIP) const;
+    [[nodiscard]] bool routerIsConnected(IPAddress neighborIP) const;
 
     /**
      * @brief Checks if a terminal with given IP is already connected.
      * @param terminalIP IP address of the terminal.
      * @return true if connected, false otherwise.
      */
-    bool terminalIsConnected(IPAddress terminalIP) const;
+    [[nodiscard]] bool terminalIsConnected(IPAddress terminalIP) const;
 };
 
 inline void Router::setRoutingTable(RoutingTable table) {
