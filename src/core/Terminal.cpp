@@ -1,4 +1,5 @@
 #include "core/Terminal.h"
+#include "core/Router.h"
 
 Terminal::Terminal(IPAddress ip, Router* router, size_t outputCapacity, size_t inputCapacity, size_t externalBW,
                    size_t internalBW)
@@ -9,10 +10,14 @@ Terminal::Terminal(IPAddress ip, Router* router, size_t outputCapacity, size_t i
       externalBW(externalBW),
       internalBW(internalBW),
       sentPages(0),
+      receivedPackets(0),
       receivedPages(0),
       nextPageID(0) {
     if (!router) {
         throw std::invalid_argument("Router cannot be nullptr");
+    }
+    if (router->getIP().getRouterIP() != ip.getRouterIP()) {
+        throw std::invalid_argument("Terminal does not belong to this router");
     }
 }
 
@@ -36,6 +41,7 @@ bool Terminal::sendPage(size_t length, IPAddress destIP) {
 
 bool Terminal::receivePacket(const Packet& packet) {
     if (inputBuffer.enqueue(packet)) {
+        receivedPackets++;
         return true;
     }
     return false;
@@ -50,11 +56,9 @@ size_t Terminal::processOutputBuffer() {
     size_t packetsSent = 0;
 
     while (packetsSent < externalBW && !outputBuffer.isEmpty()) {
-        Packet packet = outputBuffer.dequeue();
+        const Packet packet = outputBuffer.dequeue();
 
-        // TODO: implement router
-        // connectedRouter->receivePacket(packet, this);
-
+        connectedRouter->receivePacket(packet);
         packetsSent++;
     }
 

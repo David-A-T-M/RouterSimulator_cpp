@@ -5,7 +5,10 @@
 #include <sstream>
 
 // =============== Constructors & Destructor ===============
-PacketBuffer::PacketBuffer(Mode mode, size_t capacity) : mode(mode), capacity(capacity) {}
+PacketBuffer::PacketBuffer(Mode mode, size_t capacity) : mode(mode), capacity(capacity), destinationIP(IPAddress{}) {}
+
+PacketBuffer::PacketBuffer(IPAddress ip, Mode mode, size_t capacity)
+    : mode(mode), capacity(capacity), destinationIP(ip) {}
 
 // =============== Getters ===============
 int PacketBuffer::getMaxPriority() const {

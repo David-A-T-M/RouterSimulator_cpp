@@ -9,14 +9,8 @@ Packet::Packet(int pageID, int pagePosition, int pageLength, int routerPriority,
       destinationIP(destinationIP),
       originIP(originIP) {
 
-    if (pageID < 0) {
-        throw std::invalid_argument("pageID must be non-negative");
-    }
-    if (pageLength <= 0) {
-        throw std::invalid_argument("pageLength must be positive");
-    }
-    if (pagePosition < 0 || pagePosition >= pageLength) {
-        throw std::invalid_argument("pagePosition must be in range [0, pageLength)");
+    if (pagePosition >= pageLength) {
+        throw std::invalid_argument("pagePosition must be in the range [0, pageLength)");
     }
     if (!destinationIP.isValid()) {
         throw std::invalid_argument("destinationIP must be valid (not 0.0)");

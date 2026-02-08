@@ -3,6 +3,16 @@
 #include "core/Page.h"
 
 // =============== Constructors tests ===============
+TEST(PacketBufferConstructors, DefaultConstructor) {
+    const PacketBuffer buffer{};
+
+    EXPECT_EQ(buffer.getMode(), PacketBuffer::Mode::FIFO);
+    EXPECT_TRUE(buffer.isEmpty());
+    EXPECT_EQ(buffer.size(), 0);
+    EXPECT_EQ(buffer.getCapacity(), 0);  // Unlimited
+    EXPECT_FALSE(buffer.getDestinationIP().isValid());
+}
+
 TEST(PacketBufferConstructors, ConstructorFIFO) {
     const PacketBuffer buffer(PacketBuffer::Mode::FIFO);
 
@@ -10,6 +20,7 @@ TEST(PacketBufferConstructors, ConstructorFIFO) {
     EXPECT_TRUE(buffer.isEmpty());
     EXPECT_EQ(buffer.size(), 0);
     EXPECT_EQ(buffer.getCapacity(), 0);  // Unlimited
+    EXPECT_FALSE(buffer.getDestinationIP().isValid());
 }
 
 TEST(PacketBufferConstructors, ConstructorPriority) {
@@ -18,6 +29,17 @@ TEST(PacketBufferConstructors, ConstructorPriority) {
     EXPECT_EQ(buffer.getMode(), PacketBuffer::Mode::PRIORITY);
     EXPECT_EQ(buffer.getCapacity(), 100);
     EXPECT_FALSE(buffer.isFull());
+    EXPECT_FALSE(buffer.getDestinationIP().isValid());
+}
+
+TEST(PacketBufferConstructors, ConstructorWithIP) {
+    const IPAddress routerIP(15, 0);
+    const PacketBuffer buffer(routerIP);
+
+    EXPECT_EQ(buffer.getDestinationIP(), routerIP);
+    EXPECT_EQ(buffer.getMode(), PacketBuffer::Mode::PRIORITY);
+    EXPECT_EQ(buffer.getCapacity(), 0);
+    EXPECT_TRUE(buffer.getDestinationIP().isValid());
 }
 
 // =============== Getters ===============

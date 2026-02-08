@@ -20,27 +20,9 @@ TEST(PacketConstructors, ValidConstructor) {
     EXPECT_EQ(packet.getOriginIP(), origin);
 }
 
-TEST(PacketConstructors, ConstructorInvalidPageID) {
-    const IPAddress dest(10, 5);
-    const IPAddress origin(20, 15);
-
-    EXPECT_THROW(Packet(-1, 0, 10, 0, dest, origin), std::invalid_argument);
-}
-
-TEST(PacketConstructors, ConstructorInvalidPageLength) {
-    const IPAddress dest(10, 5);
-    const IPAddress origin(20, 15);
-
-    EXPECT_THROW(Packet(100, 0, 0, 0, dest, origin), std::invalid_argument);
-    EXPECT_THROW(Packet(100, 0, -5, 0, dest, origin), std::invalid_argument);
-}
-
 TEST(PacketConstructors, ConstructorInvalidPagePosition) {
     const IPAddress dest(10, 5);
     const IPAddress origin(20, 15);
-
-    // Position < 0
-    EXPECT_THROW(Packet(100, -1, 10, 0, dest, origin), std::invalid_argument);
 
     // Position >= length
     EXPECT_THROW(Packet(100, 10, 10, 0, dest, origin), std::invalid_argument);

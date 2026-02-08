@@ -1,4 +1,6 @@
 #pragma once
+
+#include <memory>
 #include "IPAddress.h"
 #include "PacketBuffer.h"
 #include "Page.h"
@@ -12,14 +14,15 @@ class Terminal {
 
     PacketBuffer outputBuffer;          /**< Priority queue for outgoing packets */
     PacketBuffer inputBuffer;           /**< FIFO queue for incoming packets */
-    List<PageReassembler> reassemblers; /**< Active page reassemblers (usar punteros para TTL) */
+    List<PageReassembler> reassemblers; /**< Active page reassemblers */
 
     size_t externalBW; /**< Packets per cycle to router (default 4) */
     size_t internalBW; /**< Packets per cycle from input buffer (default 8) */
 
-    size_t sentPages;     /**< Total pages successfully sent */
-    size_t receivedPages; /**< Total pages successfully received */
-    size_t nextPageID;    /**< ID for the next page to be sent */
+    size_t sentPages;       /**< Total pages successfully sent */
+    size_t receivedPackets; /**< Total packets received (for stats) */
+    size_t receivedPages;   /**< Total pages successfully received */
+    size_t nextPageID;      /**< ID for the next page to be sent */
 public:
     /**
      * @brief Constructor for Terminal.
@@ -111,6 +114,12 @@ public:
     void setInternalBW(size_t bw) noexcept;
 
     /**
+     * @brief Gets the number of packets received (for statistics).
+     * @return Number of packets received.
+     */
+    [[nodiscard]] size_t getReceivedPackets() const noexcept;
+
+    /**
      * @brief Gets the number of pages received.
      * @return Number of pages received.
      */
@@ -169,6 +178,10 @@ private:
      */
     void removeReassembler(const PageReassembler* reassembler);
 };
+
+inline size_t Terminal::getReceivedPackets() const noexcept {
+    return receivedPackets;
+}
 
 inline size_t Terminal::getReceivedPages() const noexcept {
     return receivedPages;
