@@ -1,4 +1,6 @@
 #pragma once
+
+#include <memory>
 #include "IPAddress.h"
 #include "PacketBuffer.h"
 #include "Page.h"
@@ -12,7 +14,7 @@ class Terminal {
 
     PacketBuffer outputBuffer;          /**< Priority queue for outgoing packets */
     PacketBuffer inputBuffer;           /**< FIFO queue for incoming packets */
-    List<PageReassembler> reassemblers; /**< Active page reassemblers (usar punteros para TTL) */
+    List<PageReassembler> reassemblers; /**< Active page reassemblers */
 
     size_t externalBW; /**< Packets per cycle to router (default 4) */
     size_t internalBW; /**< Packets per cycle from input buffer (default 8) */
