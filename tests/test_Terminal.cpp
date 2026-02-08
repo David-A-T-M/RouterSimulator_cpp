@@ -1,21 +1,14 @@
 #include <gtest/gtest.h>
+
+#include "core/Router.h"
 #include "core/Terminal.h"
-
-class MockRouter {
-public:
-    IPAddress ip;
-    List<Packet> receivedPackets;
-
-    explicit MockRouter(IPAddress ip) : ip(ip) {}
-    void receivePacket(const Packet& packet) { receivedPackets.pushBack(packet); }
-};
 
 // =============== Constructor tests ===============
 TEST(TerminalConstructor, ValidConstructor) {
-    MockRouter router{IPAddress{5, 0}};
+    Router router{IPAddress{5, 0}};
     const IPAddress terminalIP(5, 10);
 
-    const Terminal terminal(terminalIP, reinterpret_cast<Router*>(&router));
+    const Terminal terminal(terminalIP, &router);
 
     EXPECT_EQ(terminal.getTerminalIP(), terminalIP);
     EXPECT_EQ(terminal.getSentPages(), 0);
@@ -26,10 +19,10 @@ TEST(TerminalConstructor, ValidConstructor) {
 }
 
 TEST(TerminalConstructor, ConstructorWithCustomBW) {
-    MockRouter router{IPAddress{5, 0}};
+    Router router{IPAddress{5, 0}};
     const IPAddress terminalIP(5, 10);
 
-    const Terminal terminal(terminalIP, reinterpret_cast<Router*>(&router), 100, 200, 10, 20);
+    const Terminal terminal(terminalIP, &router, 100, 200, 10, 20);
 
     EXPECT_EQ(terminal.getExternalBW(), 10);
     EXPECT_EQ(terminal.getInternalBW(), 20);
@@ -43,22 +36,22 @@ TEST(TerminalConstructor, ConstructorNullRouter) {
 
 // =============== Transmission tests ===============
 TEST(TerminalTransmission, SendPageBasic) {
-    MockRouter router{IPAddress{5, 0}};
+    Router router{IPAddress{5, 0}};
     const IPAddress terminalIP(5, 10);
     const IPAddress destIP(10, 20);
 
-    Terminal terminal(terminalIP, reinterpret_cast<Router*>(&router));
+    Terminal terminal(terminalIP, &router);
 
     EXPECT_TRUE(terminal.sendPage(5, destIP));
     EXPECT_EQ(terminal.getSentPages(), 1);
 }
 
 TEST(TerminalTransmission, SendMultiplePages) {
-    MockRouter router{IPAddress{5, 0}};
+    Router router{IPAddress{5, 0}};
     const IPAddress terminalIP(5, 10);
     const IPAddress destIP(10, 20);
 
-    Terminal terminal(terminalIP, reinterpret_cast<Router*>(&router));
+    Terminal terminal(terminalIP, &router);
 
     terminal.sendPage(5, destIP);
     terminal.sendPage(10, destIP);
@@ -68,22 +61,22 @@ TEST(TerminalTransmission, SendMultiplePages) {
 }
 
 TEST(TerminalTransmission, SendPageBufferOverflow) {
-    MockRouter router{IPAddress{5, 0}};
+    Router router{IPAddress{5, 0}};
     const IPAddress terminalIP(5, 10);
     const IPAddress destIP(10, 20);
 
-    Terminal terminal(terminalIP, reinterpret_cast<Router*>(&router), 5, 100);
+    Terminal terminal(terminalIP, &router, 5, 100);
 
     EXPECT_FALSE(terminal.sendPage(10, destIP));
 }
 
 // =============== Reception tests ===============
 TEST(TerminalReception, ReceivePacketBasic) {
-    MockRouter router{IPAddress{5, 0}};
+    Router router{IPAddress{5, 0}};
     const IPAddress terminalIP(5, 10);
     const IPAddress originIP(10, 20);
 
-    Terminal terminal(terminalIP, reinterpret_cast<Router*>(&router));
+    Terminal terminal(terminalIP, &router);
 
     const Packet packet(100, 0, 5, 0, terminalIP, originIP);
 
@@ -92,11 +85,11 @@ TEST(TerminalReception, ReceivePacketBasic) {
 }
 
 TEST(TerminalReception, ReceivePacketBufferFull) {
-    MockRouter router{IPAddress{5, 0}};
+    Router router{IPAddress{5, 0}};
     const IPAddress terminalIP(5, 10);
     const IPAddress originIP(10, 20);
 
-    Terminal terminal(terminalIP, reinterpret_cast<Router*>(&router), 50, 3);
+    Terminal terminal(terminalIP, &router, 50, 3);
 
     EXPECT_TRUE(terminal.receivePacket(Packet(100, 0, 5, 0, terminalIP, originIP)));
     EXPECT_TRUE(terminal.receivePacket(Packet(100, 1, 5, 0, terminalIP, originIP)));
@@ -108,11 +101,11 @@ TEST(TerminalReception, ReceivePacketBufferFull) {
 
 // =============== Buffer tests ===============
 TEST(TerminalBuffer, ProcessInputBufferCompletePage) {
-    MockRouter router{IPAddress{5, 0}};
+    Router router{IPAddress{5, 0}};
     const IPAddress terminalIP(5, 10);
     const IPAddress originIP(10, 20);
 
-    Terminal terminal(terminalIP, reinterpret_cast<Router*>(&router));
+    Terminal terminal(terminalIP, &router);
 
     terminal.receivePacket(Packet(100, 0, 3, 0, terminalIP, originIP));
     terminal.receivePacket(Packet(100, 1, 3, 0, terminalIP, originIP));
@@ -124,11 +117,11 @@ TEST(TerminalBuffer, ProcessInputBufferCompletePage) {
 }
 
 TEST(TerminalBuffer, ProcessInputBufferIncompletePage) {
-    MockRouter router{IPAddress{5, 0}};
+    Router router{IPAddress{5, 0}};
     const IPAddress terminalIP(5, 10);
     const IPAddress originIP(10, 20);
 
-    Terminal terminal(terminalIP, reinterpret_cast<Router*>(&router));
+    Terminal terminal(terminalIP, &router);
 
     terminal.receivePacket(Packet(100, 0, 5, 0, terminalIP, originIP));
     terminal.receivePacket(Packet(100, 1, 5, 0, terminalIP, originIP));
@@ -139,11 +132,11 @@ TEST(TerminalBuffer, ProcessInputBufferIncompletePage) {
 }
 
 TEST(TerminalBuffer, ProcessInputBufferMultiplePages) {
-    MockRouter router{IPAddress{5, 0}};
+    Router router{IPAddress{5, 0}};
     const IPAddress terminalIP(5, 10);
     const IPAddress originIP(10, 20);
 
-    Terminal terminal(terminalIP, reinterpret_cast<Router*>(&router));
+    Terminal terminal(terminalIP, &router);
 
     terminal.receivePacket(Packet(100, 0, 2, 0, terminalIP, originIP));
     terminal.receivePacket(Packet(100, 1, 2, 0, terminalIP, originIP));
@@ -156,11 +149,11 @@ TEST(TerminalBuffer, ProcessInputBufferMultiplePages) {
 }
 
 TEST(TerminalBuffer, ProcessInputBufferOutOfOrder) {
-    MockRouter router{IPAddress{5, 0}};
+    Router router{IPAddress{5, 0}};
     const IPAddress terminalIP(5, 10);
     const IPAddress originIP(10, 20);
 
-    Terminal terminal(terminalIP, reinterpret_cast<Router*>(&router));
+    Terminal terminal(terminalIP, &router);
 
     terminal.receivePacket(Packet(100, 2, 3, 0, terminalIP, originIP));
     terminal.receivePacket(Packet(100, 0, 3, 0, terminalIP, originIP));
@@ -172,11 +165,11 @@ TEST(TerminalBuffer, ProcessInputBufferOutOfOrder) {
 }
 
 TEST(TerminalBuffer, ProcessInputBufferDuplicatePacket) {
-    MockRouter router{IPAddress{5, 0}};
+    Router router{IPAddress{5, 0}};
     const IPAddress terminalIP(5, 10);
     const IPAddress originIP(10, 20);
 
-    Terminal terminal(terminalIP, reinterpret_cast<Router*>(&router));
+    Terminal terminal(terminalIP, &router);
 
     terminal.receivePacket(Packet(100, 0, 2, 0, terminalIP, originIP));
     terminal.receivePacket(Packet(100, 1, 2, 0, terminalIP, originIP));
@@ -193,12 +186,12 @@ TEST(TerminalBuffer, ProcessInputBufferDuplicatePacket) {
 }
 
 TEST(TerminalBuffer, ProcessInputBufferWrongDestination) {
-    MockRouter router{IPAddress{5, 0}};
+    Router router{IPAddress{5, 0}};
     const IPAddress terminalIP(5, 10);
     const IPAddress wrongIP(8, 20);
     const IPAddress originIP(10, 20);
 
-    Terminal terminal(terminalIP, reinterpret_cast<Router*>(&router));
+    Terminal terminal(terminalIP, &router);
 
     terminal.receivePacket(Packet(100, 0, 3, 0, wrongIP, originIP));
 
@@ -206,11 +199,11 @@ TEST(TerminalBuffer, ProcessInputBufferWrongDestination) {
 }
 
 TEST(TerminalBuffer, ProcessInputBufferBandwidthLimit) {
-    MockRouter router{IPAddress{5, 0}};
+    Router router{IPAddress{5, 0}};
     const IPAddress terminalIP(5, 10);
     const IPAddress originIP(10, 20);
 
-    Terminal terminal(terminalIP, reinterpret_cast<Router*>(&router), 50, 100, 4, 2);
+    Terminal terminal(terminalIP, &router, 50, 100, 4, 2);
 
     for (int i = 0; i < 5; ++i) {
         terminal.receivePacket(Packet(100, i, 10, 0, terminalIP, originIP));
@@ -221,26 +214,26 @@ TEST(TerminalBuffer, ProcessInputBufferBandwidthLimit) {
 }
 
 TEST(TerminalBuffer, ProcessOutputBuffer) {
-    MockRouter router{IPAddress{5, 0}};
+    Router router{IPAddress{5, 0}};
     const IPAddress terminalIP(5, 10);
     const IPAddress destIP(10, 20);
 
-    Terminal terminal(terminalIP, reinterpret_cast<Router*>(&router), 100, 100, 3, 100);
+    Terminal terminal(terminalIP, &router, 100, 100, 3, 100);
 
     terminal.sendPage(5, destIP);
 
     const size_t sent = terminal.processOutputBuffer();
     EXPECT_EQ(sent, 3);
     EXPECT_EQ(terminal.getSentPages(), 1);
-    EXPECT_EQ(router.receivedPackets.size(), 3);
+    EXPECT_EQ(router.getPacketsReceived(), 3);
 }
 
 // =============== BW Configuration tests ===============
 TEST(TerminalBW, SetExternalBW) {
-    MockRouter router{IPAddress{5, 0}};
+    Router router{IPAddress{5, 0}};
     const IPAddress terminalIP(5, 10);
 
-    Terminal terminal(terminalIP, reinterpret_cast<Router*>(&router));
+    Terminal terminal(terminalIP, &router);
 
     terminal.setExternalBW(10);
 
@@ -248,10 +241,10 @@ TEST(TerminalBW, SetExternalBW) {
 }
 
 TEST(TerminalBW, SetInternalBW) {
-    MockRouter router{IPAddress{5, 0}};
+    Router router{IPAddress{5, 0}};
     const IPAddress terminalIP(5, 10);
 
-    Terminal terminal(terminalIP, reinterpret_cast<Router*>(&router));
+    Terminal terminal(terminalIP, &router);
 
     terminal.setInternalBW(20);
 
@@ -260,10 +253,10 @@ TEST(TerminalBW, SetInternalBW) {
 
 // =============== Utilities tests ===============
 TEST(TerminalUtilities, ToString) {
-    MockRouter router{IPAddress{5, 0}};
+    Router router{IPAddress{5, 0}};
     const IPAddress terminalIP(5, 10);
 
-    const Terminal terminal(terminalIP, reinterpret_cast<Router*>(&router));
+    const Terminal terminal(terminalIP, &router);
 
     std::string str = terminal.toString();
 
@@ -273,11 +266,11 @@ TEST(TerminalUtilities, ToString) {
 
 // =============== Complex tests ===============
 TEST(TerminalComplex, ComplexScenario) {
-    MockRouter router{IPAddress{5, 0}};
+    Router router{IPAddress{5, 0}};
     const IPAddress terminalIP(5, 10);
     const IPAddress originIP(10, 20);
 
-    Terminal terminal(terminalIP, reinterpret_cast<Router*>(&router));
+    Terminal terminal(terminalIP, &router);
 
     for (int i = 0; i < 5; ++i) {
         terminal.sendPage(10, IPAddress(10, 20));
