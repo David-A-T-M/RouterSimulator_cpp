@@ -49,7 +49,7 @@ public:
     /**
      * @brief Destructor for Router.
      */
-    ~Router() = default;
+    ~Router();
 
     /**
      * @brief Copy constructor - deleted to prevent copying.
@@ -199,6 +199,12 @@ public:
      */
     [[nodiscard]] size_t getNeighborBufferUsage(IPAddress neighborIP) const;
 
+    /**
+     *
+     * @return Const reference to the list of RouterConnections.
+     */
+    [[nodiscard]] const List<RouterConnection>& getConnections() const noexcept;
+
     // =============== Utilities ===============
     /**
      * @brief Gets string representation.
@@ -279,6 +285,10 @@ inline size_t Router::getConnectedRouters() const noexcept {
 
 inline size_t Router::getLocalBufferUsage() const noexcept {
     return localBuffer.size();
+}
+
+inline const List<RouterConnection>& Router::getConnections() const noexcept {
+    return connections;
 }
 
 inline void Router::setInternalBW(size_t bw) noexcept {

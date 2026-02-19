@@ -18,6 +18,8 @@ Router::Router(IPAddress routerIP, size_t inputCapacity, size_t internalBW, size
     }
 }
 
+Router::~Router() = default;
+
 void Router::connectTerminal(TerminalPtr terminal) {
     if (!terminal) {
         throw std::invalid_argument("Terminal cannot be nullptr");
