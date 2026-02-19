@@ -24,7 +24,7 @@ RoutingTable DijkstraAlgorithm::computeRoutingTable(const List<const Router*>& r
         // Find unvisited router with minimum distance
         const size_t currentIndex = findMinDistance(distances, routerCount);
 
-        if (currentIndex == -1) {
+        if (currentIndex == std::numeric_limits<size_t>::max()) {
             break;  // All reachable routers visited, exit main loop
         }
 
@@ -104,7 +104,7 @@ size_t DijkstraAlgorithm::getRouterIndex(const List<const Router*>& routers, IPA
 
 size_t DijkstraAlgorithm::findMinDistance(const List<DistanceInfo>& distances, size_t routerCount) {
     size_t minDistance  = INF;
-    size_t currentIndex = -1;
+    size_t currentIndex = std::numeric_limits<size_t>::max();
     for (size_t j = 0; j < routerCount; j++) {
         if (!distances[j].visited && distances[j].distance < minDistance) {
             minDistance  = distances[j].distance;
