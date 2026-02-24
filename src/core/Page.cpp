@@ -1,68 +1,64 @@
 #include "core/Page.h"
 
-Page::Page(size_t pageID, size_t pageLength, IPAddress originIP, IPAddress destinationIP)
-    : pageID(pageID), pageLength(pageLength), originIP(originIP), destinationIP(destinationIP) {
-    if (!destinationIP.isValid()) {
+Page::Page(size_t pageID, size_t pageLen, IPAddress srcIP, IPAddress dstIP)
+    : pageID(pageID), pageLen(pageLen), srcIP(srcIP), dstIP(dstIP) {
+    if (!dstIP.isValid()) {
         throw std::invalid_argument("destinationIP must be valid (not 0.0)");
     }
-    if (!originIP.isValid()) {
+    if (!srcIP.isValid()) {
         throw std::invalid_argument("originIP must be valid (not 0.0)");
     }
 }
 
-Page::Page(List<Packet>&& completedPackets) {
-    if (completedPackets.isEmpty()) {
+Page::Page(List<Packet>&& packets) {
+    if (packets.isEmpty()) {
         throw std::invalid_argument("Cannot create Page from empty packet list");
     }
 
-    const Packet& firstPacket = completedPackets[0];
+    const Packet& firstPacket = packets[0];
 
-    pageID        = firstPacket.getPageID();
-    pageLength    = firstPacket.getPageLength();
-    originIP      = firstPacket.getOriginIP();
-    destinationIP = firstPacket.getDestinationIP();
+    pageID  = firstPacket.getPageID();
+    pageLen = firstPacket.getPageLen();
+    srcIP   = firstPacket.getSrcIP();
+    dstIP   = firstPacket.getDstIP();
 
-    if (completedPackets.size() != pageLength) {
-        throw std::invalid_argument("Packet count (" + std::to_string(completedPackets.size()) +
-                                    ") does not match page length (" + std::to_string(pageLength) + ")");
+    if (packets.size() != pageLen) {
+        throw std::invalid_argument("Packet count (" + std::to_string(packets.size()) +
+                                    ") does not match page length (" + std::to_string(pageLen) + ")");
     }
 
-    for (int i = 0; i < completedPackets.size(); ++i) {
-        const Packet& packet = completedPackets[i];
+    for (int i = 0; i < packets.size(); ++i) {
+        const Packet& packet = packets[i];
 
         if (packet.getPageID() != pageID) {
             throw std::invalid_argument("Packet " + std::to_string(i) + " has inconsistent pageID: " +
                                         std::to_string(packet.getPageID()) + " vs " + std::to_string(pageID));
         }
 
-        if (packet.getPageLength() != pageLength) {
+        if (packet.getPageLen() != pageLen) {
             throw std::invalid_argument("Packet " + std::to_string(i) + " has inconsistent pageLength");
         }
 
-        if (packet.getOriginIP() != originIP) {
+        if (packet.getSrcIP() != srcIP) {
             throw std::invalid_argument("Packet " + std::to_string(i) + " has inconsistent originIP");
         }
 
-        if (packet.getDestinationIP() != destinationIP) {
+        if (packet.getDstIP() != dstIP) {
             throw std::invalid_argument("Packet " + std::to_string(i) + " has inconsistent destinationIP");
         }
 
-        if (packet.getPagePosition() != i) {
+        if (packet.getPagePos() != i) {
             throw std::invalid_argument("Packet at index " + std::to_string(i) +
-                                        " has wrong position: " + std::to_string(packet.getPagePosition()));
+                                        " has wrong position: " + std::to_string(packet.getPagePos()));
         }
     }
 }
 
-List<Packet> Page::fragmentToPackets() const {
-    return fragmentToPackets(0);
-}
-
-List<Packet> Page::fragmentToPackets(int initialPriority) const {
+List<Packet> Page::toPackets(size_t expTick) const {
     List<Packet> packets;
 
-    for (int position = 0; position < pageLength; ++position) {
-        packets.pushBack(Packet(pageID, position, pageLength, initialPriority, destinationIP, originIP));
+    for (int pos = 0; pos < pageLen; ++pos) {
+        packets.pushBack(Packet ( pageID, pos, pageLen, srcIP, dstIP, expTick));
     }
 
     return packets;
@@ -70,8 +66,7 @@ List<Packet> Page::fragmentToPackets(int initialPriority) const {
 
 std::string Page::toString() const {
     std::ostringstream oss;
-    oss << "Page{ID=" << pageID << ", Length=" << pageLength << ", From=" << originIP << ", To=" << destinationIP
-        << "}";
+    oss << "Page{ID: " << pageID << " | Len: " << pageLen << " | " << srcIP << " -> " << dstIP << "}";
     return oss.str();
 }
 
