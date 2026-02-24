@@ -93,16 +93,16 @@ TEST(IPAddressQuery, IsValid) {
 
 // =============== Utilities tests ===============
 TEST(IPAddressUtilities, ToStringRouter) {
-    EXPECT_EQ(IPAddress(0, 0).toString(), "Router(0)");
-    EXPECT_EQ(IPAddress(10, 0).toString(), "Router(10)");
-    EXPECT_EQ(IPAddress(255, 0).toString(), "Router(255)");
+    EXPECT_EQ(IPAddress(0, 0).toString(), "000.000");
+    EXPECT_EQ(IPAddress(10, 0).toString(), "010.000");
+    EXPECT_EQ(IPAddress(255, 0).toString(), "255.000");
 }
 
 TEST(IPAddressUtilities, ToStringTerminal) {
-    EXPECT_EQ(IPAddress(10, 1).toString(), "10.1");
+    EXPECT_EQ(IPAddress(10, 1).toString(), "010.001");
     EXPECT_EQ(IPAddress(192, 168).toString(), "192.168");
     EXPECT_EQ(IPAddress(255, 255).toString(), "255.255");
-    EXPECT_EQ(IPAddress(0, 1).toString(), "0.1");
+    EXPECT_EQ(IPAddress(0, 1).toString(), "000.001");
 }
 
 TEST(IPAddressUtilities, StreamOperatorRouter) {
@@ -111,7 +111,7 @@ TEST(IPAddressUtilities, StreamOperatorRouter) {
 
     oss << ip;
 
-    EXPECT_EQ(oss.str(), "Router(42)");
+    EXPECT_EQ(oss.str(), "042.000");
 }
 
 TEST(IPAddressUtilities, StreamOperatorTerminal) {
@@ -130,7 +130,7 @@ TEST(IPAddressUtilities, StreamOperatorMultiple) {
 
     oss << ip1 << " and " << ip2;
 
-    EXPECT_EQ(oss.str(), "Router(10) and 20.30");
+    EXPECT_EQ(oss.str(), "010.000 and 020.030");
 }
 
 // =============== Comparison Operators tests ===============
