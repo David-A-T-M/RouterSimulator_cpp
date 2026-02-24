@@ -38,11 +38,17 @@ public:
      */
     class Iterator {
     public:
+        /** @brief Iterator category (required for STL algorithm compatibility) */
         using iterator_category = std::forward_iterator_tag;
+        /** @brief Type of the element pointed to by the iterator */
         using value_type        = T;
+        /** @brief Type to represent the distance between two iterators */
         using difference_type   = std::ptrdiff_t;
-        using pointer           = T*;
-        using reference         = T&;
+        /** @brief Type for a pointer to the constant value */
+        using pointer           = const T*;
+        /** @brief Type for a reference to the constant value */
+        using reference         = const T&;
+
         /**
          * @brief Construct an iterator pointing to a node.
          * @param node Pointer to the node this iterator will reference (may be nullptr).
@@ -111,11 +117,17 @@ public:
      */
     class ConstIterator {
     public:
+        /** @brief Iterator category (required for STL algorithm compatibility) */
         using iterator_category = std::forward_iterator_tag;
+        /** @brief Type of the element pointed to by the iterator */
         using value_type        = T;
+        /** @brief Type to represent the distance between two iterators */
         using difference_type   = std::ptrdiff_t;
+        /** @brief Type for a pointer to the constant value */
         using pointer           = const T*;
+        /** @brief Type for a reference to the constant value */
         using reference         = const T&;
+
         /**
          * @brief Construct a const iterator pointing to a node.
          * @param node Pointer to the node this iterator will reference (may be nullptr).
