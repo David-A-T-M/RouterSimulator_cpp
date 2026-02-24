@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <iomanip>
 #include <string>
 
 /**
@@ -18,7 +19,7 @@ class IPAddress {
 public:
     // =============== Constructors & Destructor ===============
     /**
-     * @brief Default constructor initializes the IP address to 0.0.
+     * @brief Default constructor, initializes the IP address to 0.0.
      */
     constexpr IPAddress() noexcept = default;
 
@@ -56,11 +57,13 @@ public:
 
     /**
      * @brief Default copy assignment operator.
+     * @return Reference to this IPAddress after assignment.
      */
     IPAddress& operator=(const IPAddress&) = default;
 
     /**
      * @brief Default move assignment operator.
+     * @return Reference to this IPAddress after move assignment.
      */
     IPAddress& operator=(IPAddress&&) noexcept = default;
 
@@ -197,10 +200,10 @@ inline std::string IPAddress::toString() const {
     const uint8_t r = getRouterIP();
     const uint8_t t = getTerminalIP();
 
-    if (t == 0) {
-        return "Router(" + std::to_string(r) + ")";
-    }
-    return std::to_string(r) + "." + std::to_string(t);
+    std::ostringstream oss;
+    oss << std::setfill('0') << std::setw(3) << +r << "." << std::setfill('0') << std::setw(3) << +t;
+
+    return oss.str();
 }
 
 inline std::ostream& operator<<(std::ostream& os, const IPAddress& ip) {
