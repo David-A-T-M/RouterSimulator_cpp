@@ -58,7 +58,7 @@ List<Packet> Page::toPackets(size_t expTick) const {
     List<Packet> packets;
 
     for (int pos = 0; pos < pageLen; ++pos) {
-        packets.pushBack(Packet ( pageID, pos, pageLen, srcIP, dstIP, expTick));
+        packets.pushBack(Packet(pageID, pos, pageLen, srcIP, dstIP, expTick));
     }
 
     return packets;
