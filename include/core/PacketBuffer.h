@@ -5,49 +5,35 @@
 
 /**
  * @class PacketBuffer
- * @brief A flexible packet buffer supporting FIFO and priority-based queueing.
+ * @brief A packet buffer supporting FIFO queueing.
  *
- * This class wraps a List<Packet> and provides two operation modes:
- * - FIFO mode: Simple queue (enqueue at back, dequeue from front)
- * - Priority mode: Packets inserted based on router priority (lower value = higher priority)
+ * This class wraps a List<Packet> and provides a simple queue interface (enqueue at back, dequeue from front)
  *
  * Used for:
- * - Terminal/Router input buffers (FIFO)
- * - Terminal/Router output buffers (Priority)
+ * - Terminal/Router input/output buffers (FIFO)
  */
 class PacketBuffer {
-public:
-    /**
-     * @enum Mode
-     * @brief Defines the buffer operation mode.
-     */
-    enum class Mode {
-        FIFO,    /**< First-In-First-Out (simple queue) */
-        PRIORITY /**< Priority-based insertion (sorted by router priority) */
-    };
-
-private:
-    List<Packet> packets;    /**< Internal packet storage */
-    Mode mode;               /**< Operation mode */
-    size_t capacity;         /**< Maximum capacity (0 = unlimited) */
-    IPAddress destinationIP; /**< Associated router IP (for output buffers) */
+    List<Packet> packets; /**< Internal packet storage */
+    size_t capacity;      /**< Maximum capacity (0 = unlimited) */
+    IPAddress dstIP;      /**< Associated router IP (for output buffers) */
 
 public:
     // =============== Constructors & Destructor ===============
     /**
-     * @brief Constructor with mode specification.
-     * @param mode Operation mode (FIFO or PRIORITY).
+     * @brief Constructor with optional capacity.
+     *
      * @param capacity Maximum buffer capacity (0 = unlimited, default).
      */
-    explicit PacketBuffer(Mode mode = Mode::FIFO, size_t capacity = 0);
+    explicit PacketBuffer(size_t capacity = 0);
 
     /**
      * @brief Constructor with associated router IP.
-     * @param ip Associated router IP address.
-     * @param mode Operation mode (FIFO or PRIORITY, default PRIORITY).
+     *
+     * @param dstIP Associated router IP address.
+     *
      * @param capacity Maximum buffer capacity (0 = unlimited, default).
      */
-    explicit PacketBuffer(IPAddress ip, Mode mode = Mode::PRIORITY, size_t capacity = 0);
+    explicit PacketBuffer(IPAddress dstIP, size_t capacity = 0);
 
     /**
      * @brief Destructor
@@ -66,21 +52,25 @@ public:
 
     /**
      * @brief Default Copy Assignment operator.
+     * @return Reference to this PacketBuffer.
      */
     PacketBuffer& operator=(const PacketBuffer&) = default;
 
     /**
      * @brief Default Move Assignment operator.
+     * @return Reference to this PacketBuffer.
      */
     PacketBuffer& operator=(PacketBuffer&&) noexcept = default;
 
     // =============== Getters ===============
     /**
      * @brief Gets the associated destination IP.
+     *
      * @return Destination IP address.
+     *
      * @note A 0.0 IP indicates no specific association.
      */
-    [[nodiscard]] IPAddress getDestinationIP() const noexcept;
+    [[nodiscard]] IPAddress getDstIP() const noexcept;
 
     /**
      * @brief Gets the maximum capacity.
@@ -88,33 +78,13 @@ public:
      */
     [[nodiscard]] size_t getCapacity() const noexcept;
 
-    /**
-     * @brief Gets the current operation mode.
-     * @return Current mode (FIFO or PRIORITY).
-     */
-    [[nodiscard]] Mode getMode() const noexcept;
-
-    /**
-     * @brief Gets the highest priority value in the buffer.
-     * @return Highest priority (lowest urgency), or -1 if empty.
-     */
-    [[nodiscard]] int getMaxPriority() const;
-
-    /**
-     * @brief Gets the lowest priority value in the buffer.
-     * @return Lowest priority (highest urgency), or -1 if empty.
-     */
-    [[nodiscard]] int getMinPriority() const;
-
     // =============== Queue Operations ===============
     /**
      * @brief Adds a packet to the buffer.
      *
-     * In FIFO mode: Adds to the back of the queue.
-     * In PRIORITY mode: Inserts based on router priority (lower priority value = higher urgency).
-     *
      * @param packet The packet to add.
-     * @return true if packet was added, false if buffer is full.
+     *
+     * @return true if a packet was added, false if the buffer is full.
      */
     bool enqueue(const Packet& packet);
 
@@ -124,14 +94,14 @@ public:
      * In both modes, removes from the front of the queue.
      *
      * @return The front packet.
-     * @throws std::runtime_error if buffer is empty.
+     * @throws std::runtime_error if the buffer is empty.
      */
     Packet dequeue();
 
     // =============== Query methods ===============
     /**
      * @brief Checks if the buffer is empty.
-     * @return true if no packets in buffer.
+     * @return true if no packets in the buffer.
      */
     [[nodiscard]] bool isEmpty() const noexcept;
 
@@ -143,13 +113,14 @@ public:
 
     /**
      * @brief Gets the current number of packets.
-     * @return Number of packets in buffer.
+     * @return Number of packets in the buffer.
      */
     [[nodiscard]] size_t size() const noexcept;
 
+    // =============== Query methods ===============
     /**
      * @brief Gets the number of available slots.
-     * @return capacity - size() (or INT_MAX if unlimited).
+     * @return Number of additional packets that can be added (or INT_MAX if unlimited).
      */
     [[nodiscard]] size_t availableSpace() const noexcept;
 
@@ -160,19 +131,12 @@ public:
     [[nodiscard]] double getUtilization() const noexcept;
 
     /**
-     * @brief Checks if buffer contains a packet with specific pageID and position.
+     * @brief Checks if the buffer contains a packet with a specific pageID and position.
      * @param pageID Page ID to search for.
-     * @param pagePosition Packet position to search for.
+     * @param pagePos Packet position to search for.
      * @return true if found.
      */
-    [[nodiscard]] bool contains(int pageID, int pagePosition) const;
-
-    /**
-     * @brief Counts packets belonging to a specific page.
-     * @param pageID Page ID to count.
-     * @return Number of packets from this page.
-     */
-    [[nodiscard]] size_t countPacketsFromPage(int pageID) const;
+    [[nodiscard]] bool contains(size_t pageID, size_t pagePos) const;
 
     // =============== Buffer Management ===============
     /**
@@ -185,57 +149,20 @@ public:
      * @param newCapacity New maximum capacity (0 = unlimited).
      * @throws std::invalid_argument if newCapacity < current size.
      */
-    void setCapacity(int newCapacity);
+    void setCapacity(size_t newCapacity);
+
+    /**
+     * @brief Sets the associated destination IP.
+     * @param dstIP New destination IP address.
+     */
+    void setDstIP(IPAddress dstIP) noexcept;
 
     /**
      * @brief Removes a specific packet from the buffer.
      * @param index Position to remove.
-     * @throws std::out_of_range if index is invalid.
+     * @throws std::out_of_range if the index is invalid.
      */
-    void removeAt(int index);
-
-    /**
-     * @brief Removes and returns all packets destined to a specific router.
-     *
-     * Useful for rerouting packets when routing tables change.
-     *
-     * @param routerIP Router IP to extract packets for.
-     * @return List of packets that were removed.
-     */
-    List<Packet> extractPacketsByDestinationRouter(uint8_t routerIP);
-
-    /**
-     * @brief Transfers packets to another buffer based on destination.
-     *
-     * Removes packets destined to specific router and adds them to target buffer.
-     * Used during route recalculation.
-     *
-     * @param routerIP Destination router IP to transfer.
-     * @param targetBuffer Buffer to transfer packets to.
-     * @return Number of packets transferred.
-     * @note If target buffer is full, remaining packets stay in this buffer.
-     */
-    int transferPacketsByDestination(uint8_t routerIP, PacketBuffer& targetBuffer);
-
-    /**
-     * @brief Gets all packets that should be rerouted based on a predicate function.
-     *
-     * @param shouldReroute Function that returns true if packet needs rerouting.
-     * @return List of packets that need rerouting (removed from buffer).
-     */
-    template <typename Predicate>
-    List<Packet> extractPacketsIf(Predicate shouldReroute) {
-        List<Packet> extracted;
-
-        for (size_t i = packets.size(); i > 0; --i) {
-            if (shouldReroute(packets[i - 1])) {
-                extracted.pushFront((packets[i]));
-                packets.removeAt(i);
-            }
-        }
-
-        return extracted;
-    }
+    void removeAt(size_t index);
 
     // =============== Utilities ===============
     /**
@@ -246,34 +173,29 @@ public:
 
     /**
      * @brief Stream output operator.
+     * @param os Output stream.
+     * @param buffer Buffer to output.
+     * @return Reference to the output stream.
      */
     friend std::ostream& operator<<(std::ostream& os, const PacketBuffer& buffer);
-
-private:
-    /**
-     * @brief Finds the correct insertion position for priority mode.
-     * @param packet The packet to insert.
-     * @return Index where packet should be inserted.
-     */
-    [[nodiscard]] size_t findPriorityPosition(const Packet& packet) const;
 };
 
 // =============== Getters ===============
-[[nodiscard]] inline IPAddress PacketBuffer::getDestinationIP() const noexcept {
-    return destinationIP;
+[[nodiscard]] inline IPAddress PacketBuffer::getDstIP() const noexcept {
+    return dstIP;
 }
 
 inline size_t PacketBuffer::getCapacity() const noexcept {
     return capacity;
 }
 
-inline PacketBuffer::Mode PacketBuffer::getMode() const noexcept {
-    return mode;
-}
-
 // =============== Query methods ===============
 inline bool PacketBuffer::isEmpty() const noexcept {
     return packets.isEmpty();
+}
+
+inline void PacketBuffer::setDstIP(IPAddress dstIP) noexcept {
+    PacketBuffer::dstIP = dstIP;
 }
 
 inline bool PacketBuffer::isFull() const noexcept {
