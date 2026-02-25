@@ -7,7 +7,7 @@ IPAddress RoutingTable::getNextHopIP(IPAddress destIP) {
             return nextHopIP;
         }
     }
-    return IPAddress();  // Return invalid IP if not found
+    return {};  // Return invalid IP if not found
 }
 
 void RoutingTable::setNextHopIP(IPAddress destIP, IPAddress nextHop) {

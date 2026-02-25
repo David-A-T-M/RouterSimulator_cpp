@@ -3,6 +3,14 @@
 #include "IPAddress.h"
 #include "structures/list.h"
 
+/**
+ * @class RoutingTable
+ * @brief Represents a routing table that maps destination router IPs to next hop IPs for packet forwarding.
+ *
+ * The routing table maintains a list of entries, where each entry consists of a destination router IP and the
+ * corresponding next hop IP address. The getNextHopIP method allows retrieval of the next hop IP for a given
+ * destination IP, while the setNextHopIP method allows adding or updating entries in the routing table.
+ */
 class RoutingTable {
     struct Routes {
         IPAddress destRouterIP; /**< Neighbor router IP address */
@@ -28,7 +36,7 @@ public:
      * @brief Returns the number of entries in the routing table.
      * @return Number of routing entries.
      */
-    size_t size() const;
+    [[nodiscard]] size_t size() const;
 };
 
 inline size_t RoutingTable::size() const {
