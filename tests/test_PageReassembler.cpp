@@ -12,9 +12,9 @@ protected:
 
 // ===============  Constructor tests ===============
 TEST_F(TestPageReassembler, Constructor_Valid) {
-    EXPECT_EQ(reassembler.pageID, 100);
-    EXPECT_EQ(reassembler.total, 10);
-    EXPECT_EQ(reassembler.count, 0);
+    EXPECT_EQ(reassembler.getPageID(), 100);
+    EXPECT_EQ(reassembler.getTotalPackets(), 10);
+    EXPECT_EQ(reassembler.getReceivedPackets(), 0);
     EXPECT_FALSE(reassembler.isComplete());
 }
 
@@ -24,15 +24,12 @@ TEST_F(TestPageReassembler, Constructor_Move) {
 
     const PageReassembler moved(std::move(reassembler));
 
-    EXPECT_EQ(moved.pageID, 100);
-    EXPECT_EQ(moved.total, 10);
-    EXPECT_EQ(moved.count, 2);
-    EXPECT_NE(moved.packets, nullptr);
+    EXPECT_EQ(moved.getPageID(), 100);
+    EXPECT_EQ(moved.getTotalPackets(), 10);
+    EXPECT_EQ(moved.getReceivedPackets(), 2);
     EXPECT_TRUE(moved.hasPacketAt(0));
     EXPECT_TRUE(moved.hasPacketAt(1));
     EXPECT_FALSE(moved.isComplete());
-
-    EXPECT_EQ(reassembler.packets, nullptr);
 }
 
 TEST_F(TestPageReassembler, Assignment_Move) {
@@ -40,17 +37,15 @@ TEST_F(TestPageReassembler, Assignment_Move) {
 
     reassembler = std::move(otherPR);
 
-    EXPECT_EQ(reassembler.pageID, 2);
-    EXPECT_EQ(reassembler.total, 10);
-
-    EXPECT_EQ(otherPR.packets, nullptr);
+    EXPECT_EQ(reassembler.getPageID(), 2);
+    EXPECT_EQ(reassembler.getTotalPackets(), 10);
 }
 
 TEST_F(TestPageReassembler, Move_SelfAssignment) {
     PageReassembler& ref = reassembler;
     EXPECT_NO_THROW(reassembler = std::move(ref));
 
-    EXPECT_EQ(reassembler.pageID, 100);
+    EXPECT_EQ(reassembler.getPageID(), 100);
 }
 
 // =============== Getters tests ===============
@@ -125,12 +120,12 @@ TEST_F(TestPageReassembler, AddPacket_Ordered) {
     const Packet p2(100, 2, 3, src, dst, TICK);
 
     EXPECT_TRUE(otherPR.addPacket(p0));
-    EXPECT_EQ(otherPR.count, 1);
+    EXPECT_EQ(otherPR.getReceivedPackets(), 1);
 
     EXPECT_TRUE(otherPR.addPacket(p1));
-    EXPECT_EQ(otherPR.count, 2);
+    EXPECT_EQ(otherPR.getReceivedPackets(), 2);
     EXPECT_TRUE(otherPR.addPacket(p2));
-    EXPECT_EQ(otherPR.count, 3);
+    EXPECT_EQ(otherPR.getReceivedPackets(), 3);
 
     EXPECT_TRUE(otherPR.isComplete());
 }
@@ -143,7 +138,7 @@ TEST_F(TestPageReassembler, AddPacket_Unordered) {
         Packet p(100, pos, 10, src, dst, TICK);
 
         EXPECT_TRUE(reassembler.addPacket(p));
-        EXPECT_EQ(reassembler.count, i + 1);
+        EXPECT_EQ(reassembler.getReceivedPackets(), i + 1);
     }
 
     EXPECT_TRUE(reassembler.isComplete());
@@ -153,24 +148,24 @@ TEST_F(TestPageReassembler, AddPacket_WrongPageID) {
     const Packet wrongPacket(200, 0, 10, src, dst, TICK);
 
     EXPECT_FALSE(reassembler.addPacket(wrongPacket));
-    EXPECT_EQ(reassembler.count, 0);
+    EXPECT_EQ(reassembler.getReceivedPackets(), 0);
 }
 
 TEST_F(TestPageReassembler, AddPacket_WrongPageLen) {
     const Packet wrongPacket(100, 0, 5, src, dst, TICK);
 
     EXPECT_FALSE(reassembler.addPacket(wrongPacket));
-    EXPECT_EQ(reassembler.count, 0);
+    EXPECT_EQ(reassembler.getReceivedPackets(), 0);
 }
 
 TEST_F(TestPageReassembler, AddPacket_Duplicate) {
     const Packet p0(100, 0, 10, src, dst, TICK);
 
     EXPECT_TRUE(reassembler.addPacket(p0));
-    EXPECT_EQ(reassembler.count, 1);
+    EXPECT_EQ(reassembler.getReceivedPackets(), 1);
 
     EXPECT_FALSE(reassembler.addPacket(p0));
-    EXPECT_EQ(reassembler.count, 1);
+    EXPECT_EQ(reassembler.getReceivedPackets(), 1);
 }
 
 TEST_F(TestPageReassembler, Package_Complete) {
@@ -190,7 +185,7 @@ TEST_F(TestPageReassembler, Package_Complete) {
         EXPECT_EQ(packetList[i].getPageID(), 100);
     }
 
-    EXPECT_EQ(reassembler.count, 0);
+    EXPECT_EQ(reassembler.getReceivedPackets(), 0);
 }
 
 TEST_F(TestPageReassembler, Package_Incomplete) {
@@ -231,11 +226,11 @@ TEST_F(TestPageReassembler, Reset_) {
     reassembler.addPacket(Packet(100, 2, 10, src, dst, TICK));
     reassembler.addPacket(Packet(100, 4, 10, src, dst, TICK));
 
-    EXPECT_EQ(reassembler.count, 3);
+    EXPECT_EQ(reassembler.getReceivedPackets(), 3);
 
     reassembler.reset();
 
-    EXPECT_EQ(reassembler.count, 0);
+    EXPECT_EQ(reassembler.getReceivedPackets(), 0);
     EXPECT_FALSE(reassembler.hasPacketAt(0));
     EXPECT_FALSE(reassembler.hasPacketAt(2));
     EXPECT_FALSE(reassembler.hasPacketAt(4));
@@ -263,7 +258,7 @@ TEST_F(TestPageReassembler, SimulateNetworkTransmission) {
         Packet p(100, pos, 10, src, dst, TICK);
 
         EXPECT_TRUE(reassembler.addPacket(p));
-        EXPECT_EQ(reassembler.count, i + 1);
+        EXPECT_EQ(reassembler.getReceivedPackets(), i + 1);
     }
 
     EXPECT_TRUE(reassembler.isComplete());
@@ -282,7 +277,7 @@ TEST_F(TestPageReassembler, SimulatePacketLoss) {
     reassembler.addPacket(Packet(100, 5, 10, src, dst, TICK));
     reassembler.addPacket(Packet(100, 8, 10, src, dst, TICK));
 
-    EXPECT_EQ(reassembler.count, 4);
+    EXPECT_EQ(reassembler.getReceivedPackets(), 4);
     EXPECT_FALSE(reassembler.isComplete());
     EXPECT_DOUBLE_EQ(reassembler.getCompletionRate(), 0.4);
 
@@ -294,7 +289,7 @@ TEST_F(TestPageReassembler, SimulateRetransmission) {
 
     EXPECT_FALSE(reassembler.addPacket(Packet(100, 0, 3, src, dst, TICK)));
 
-    EXPECT_EQ(reassembler.count, 1);
+    EXPECT_EQ(reassembler.getReceivedPackets(), 1);
 }
 
 TEST_F(TestPageReassembler, MultiplePages) {
@@ -305,9 +300,9 @@ TEST_F(TestPageReassembler, MultiplePages) {
     reassembler2.addPacket(Packet(200, 0, 3, src, dst, TICK));
     reassembler3.addPacket(Packet(300, 0, 7, src, dst, TICK));
 
-    EXPECT_EQ(reassembler.count, 1);
-    EXPECT_EQ(reassembler2.count, 1);
-    EXPECT_EQ(reassembler3.count, 1);
+    EXPECT_EQ(reassembler.getReceivedPackets(), 1);
+    EXPECT_EQ(reassembler2.getReceivedPackets(), 1);
+    EXPECT_EQ(reassembler3.getReceivedPackets(), 1);
 
     EXPECT_FALSE(reassembler.addPacket(Packet(200, 1, 5, src, dst, TICK)));
 }

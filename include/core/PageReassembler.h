@@ -6,20 +6,21 @@
 constexpr size_t MAX_ASSEMBLER_TTL = 250;
 
 /**
- * @struct PageReassembler
+ * @class PageReassembler
  * @brief Reassembles packets into a complete page in the correct order.
  *
  * Stores incoming packets (which may arrive out of order) in their correct positions using an array indexed by packet
  * position. Once all packets are received, creates an ordered List<Packet> ready to construct a Page. Will expire if
  * the simulation tick reaches expTick, at which point it should be discarded.
  */
-struct PageReassembler {
+class PageReassembler {
     size_t pageID;    /**< ID of the page being reassembled */
     size_t total;     /**< Total number of packets expected */
     size_t count;     /**< Number of packets received so far */
     size_t expTick;   /**< Tick of expiration */
     Packet** packets; /**< Array of packet pointers indexed by position */
 
+public:
     // =============== Constructors & Destructor ===============
     /**
      * @brief Constructor for PageReassembler.
@@ -60,6 +61,24 @@ struct PageReassembler {
     ~PageReassembler();
 
     // =============== Getters ===============
+    /**
+     * @brief Gets the page ID being reassembled.
+     * @return Page ID.
+     */
+    [[nodiscard]] size_t getPageID() const noexcept;
+
+    /**
+     * @brief Gets the total number of packets expected for this page.
+     * @return Total number of packets.
+     */
+    [[nodiscard]] size_t getTotalPackets() const noexcept;
+
+    /**
+     * @brief Gets the number of packets received so far.
+     * @return Number of packets received.
+     */
+    [[nodiscard]] size_t getReceivedPackets() const noexcept;
+
     /**
      * @brief Gets the expiration tick.
      * @return Tick at which this reassembler should expire.
@@ -156,6 +175,18 @@ inline bool PageReassembler::isComplete() const {
 }
 
 // =============== Getters ===============
+inline size_t PageReassembler::getPageID() const noexcept {
+    return pageID;
+}
+
+inline size_t PageReassembler::getTotalPackets() const noexcept {
+    return total;
+}
+
+inline size_t PageReassembler::getReceivedPackets() const noexcept {
+    return count;
+}
+
 inline size_t PageReassembler::getExpTick() const noexcept {
     return expTick;
 }
