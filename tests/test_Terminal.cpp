@@ -3,289 +3,332 @@
 #include "core/Router.h"
 #include "core/Terminal.h"
 
+class TerminalTest : public testing::Test {
+protected:
+    Router rtr{IPAddress{5, 0}};
+    IPAddress dst{5, 10};
+    IPAddress src{10, 20};
+    static constexpr size_t TERMINAL_ID = 10;
+    static constexpr size_t TICK        = 100;
+    Terminal trm{&rtr, TERMINAL_ID};
+};
+
 // =============== Constructor tests ===============
-TEST(TerminalConstructor, ValidConstructor) {
-    Router router{IPAddress{5, 0}};
-    const IPAddress terminalIP(5, 10);
+TEST_F(TerminalTest, Constructor_Default) {
+    const Terminal terminal(&rtr, TERMINAL_ID);
 
-    const Terminal terminal(terminalIP, &router);
-
-    EXPECT_EQ(terminal.getTerminalIP(), terminalIP);
-    EXPECT_EQ(terminal.getSentPages(), 0);
-    EXPECT_EQ(terminal.getReceivedPackets(), 0);
-    EXPECT_EQ(terminal.getReceivedPages(), 0);
-    EXPECT_EQ(terminal.getExternalBW(), 4);
-    EXPECT_EQ(terminal.getInternalBW(), 8);
+    EXPECT_EQ(terminal.getTerminalIP(), IPAddress(rtr.getIP().getRouterIP(), TERMINAL_ID));
+    EXPECT_EQ(terminal.getOutputBW(), Terminal::DEF_OUTPUT_BW);
+    EXPECT_EQ(terminal.getInternalProc(), Terminal::DEF_INPUT_PROC);
+    EXPECT_EQ(terminal.getPagesCreated(), 0);
+    EXPECT_EQ(terminal.getPagesSent(), 0);
+    EXPECT_EQ(terminal.getPagesDropped(), 0);
+    EXPECT_EQ(terminal.getPagesCompleted(), 0);
+    EXPECT_EQ(terminal.getPagesTimedOut(), 0);
+    EXPECT_EQ(terminal.getPacketsGenerated(), 0);
+    EXPECT_EQ(terminal.getPacketsSent(), 0);
+    EXPECT_EQ(terminal.getPacketsOutDropped(), 0);
+    EXPECT_EQ(terminal.getPacketsOutTimedOut(), 0);
+    EXPECT_EQ(terminal.getPacketsOutPending(), 0);
+    EXPECT_EQ(terminal.getPacketsReceived(), 0);
+    EXPECT_EQ(terminal.getPacketsInTimedOut(), 0);
+    EXPECT_EQ(terminal.getPacketsInDropped(), 0);
+    EXPECT_EQ(terminal.getPacketsSuccProcessed(), 0);
+    EXPECT_EQ(terminal.getPacketsInPending(), 0);
 }
 
-TEST(TerminalConstructor, ConstructorWithCustomBW) {
-    Router router{IPAddress{5, 0}};
-    const IPAddress terminalIP(5, 10);
+TEST_F(TerminalTest, Constructor_CustomConfig) {
+    const Terminal::Config cfg = {0, 12, 0, 8};
+    const Terminal terminal(&rtr, TERMINAL_ID, cfg);
 
-    const Terminal terminal(terminalIP, &router, 100, 200, 10, 20);
-
-    EXPECT_EQ(terminal.getExternalBW(), 10);
-    EXPECT_EQ(terminal.getInternalBW(), 20);
+    EXPECT_EQ(terminal.getOutputBW(), cfg.outputBW);
+    EXPECT_EQ(terminal.getInternalProc(), cfg.inProcCap);
 }
 
-TEST(TerminalConstructor, ConstructorNullRouter) {
-    const IPAddress terminalIP(5, 10);
-
-    EXPECT_THROW(Terminal(terminalIP, nullptr), std::invalid_argument);
+TEST_F(TerminalTest, Constructor_InvalidID) {
+    EXPECT_THROW(Terminal(&rtr, 0), std::invalid_argument);
 }
 
 // =============== Transmission tests ===============
-TEST(TerminalTransmission, SendPageBasic) {
-    Router router{IPAddress{5, 0}};
-    const IPAddress terminalIP(5, 10);
-    const IPAddress destIP(10, 20);
+TEST_F(TerminalTest, SendPageBasic) {
+    EXPECT_TRUE(trm.sendPage(5, src, TICK));
 
-    Terminal terminal(terminalIP, &router);
-
-    EXPECT_TRUE(terminal.sendPage(5, destIP));
-    EXPECT_EQ(terminal.getSentPages(), 1);
+    EXPECT_EQ(trm.getPagesCreated(), 1);
+    EXPECT_EQ(trm.getPagesSent(), 1);
+    EXPECT_EQ(trm.getPagesDropped(), 0);
+    EXPECT_EQ(trm.getPagesCompleted(), 0);
+    EXPECT_EQ(trm.getPagesTimedOut(), 0);
+    EXPECT_EQ(trm.getPacketsGenerated(), 5);
+    EXPECT_EQ(trm.getPacketsSent(), 0);
+    EXPECT_EQ(trm.getPacketsOutPending(), 5);
 }
 
-TEST(TerminalTransmission, SendMultiplePages) {
-    Router router{IPAddress{5, 0}};
-    const IPAddress terminalIP(5, 10);
-    const IPAddress destIP(10, 20);
+TEST_F(TerminalTest, SendMultiplePages) {
+    trm.sendPage(5, src, TICK);
+    trm.sendPage(10, src, TICK);
+    trm.sendPage(3, src, TICK);
 
-    Terminal terminal(terminalIP, &router);
-
-    terminal.sendPage(5, destIP);
-    terminal.sendPage(10, destIP);
-    terminal.sendPage(3, destIP);
-
-    EXPECT_EQ(terminal.getSentPages(), 3);
+    EXPECT_EQ(trm.getPagesCreated(), 3);
+    EXPECT_EQ(trm.getPagesSent(), 3);
+    EXPECT_EQ(trm.getPacketsGenerated(), 18);
+    EXPECT_EQ(trm.getPacketsSent(), 0);
+    EXPECT_EQ(trm.getPacketsOutPending(), 18);
 }
 
-TEST(TerminalTransmission, SendPageBufferOverflow) {
-    Router router{IPAddress{5, 0}};
-    const IPAddress terminalIP(5, 10);
-    const IPAddress destIP(10, 20);
+TEST_F(TerminalTest, SendPageBufferOverflow) {
+    const Terminal::Config cfg = {0, 12, 7, 8};
+    Terminal terminal(&rtr, TERMINAL_ID, cfg);
 
-    Terminal terminal(terminalIP, &router, 5, 100);
+    EXPECT_TRUE(terminal.sendPage(5, src, TICK));
+    EXPECT_EQ(terminal.getPagesCreated(), 1);
+    EXPECT_EQ(terminal.getPagesSent(), 1);
+    EXPECT_EQ(terminal.getPacketsGenerated(), 5);
+    EXPECT_EQ(terminal.getPacketsSent(), 0);
+    EXPECT_EQ(terminal.getPacketsOutPending(), 5);
 
-    EXPECT_FALSE(terminal.sendPage(10, destIP));
+    EXPECT_FALSE(terminal.sendPage(3, src, TICK));
+    EXPECT_EQ(terminal.getPagesCreated(), 2);
+    EXPECT_EQ(terminal.getPagesSent(), 1);
+    EXPECT_EQ(terminal.getPagesDropped(), 1);
+    EXPECT_EQ(terminal.getPacketsGenerated(), 8);
+    EXPECT_EQ(terminal.getPacketsOutPending(), 5);
+    EXPECT_EQ(terminal.getPacketsOutDropped(), 3);
+
+    EXPECT_TRUE(terminal.sendPage(2, src, TICK));
+    EXPECT_EQ(terminal.getPagesCreated(), 3);
+    EXPECT_EQ(terminal.getPagesSent(), 2);
+    EXPECT_EQ(terminal.getPagesDropped(), 1);
+    EXPECT_EQ(terminal.getPacketsGenerated(), 10);
+    EXPECT_EQ(terminal.getPacketsOutPending(), 7);
+    EXPECT_EQ(terminal.getPacketsOutDropped(), 3);
 }
 
 // =============== Reception tests ===============
-TEST(TerminalReception, ReceivePacketBasic) {
-    Router router{IPAddress{5, 0}};
-    const IPAddress terminalIP(5, 10);
-    const IPAddress originIP(10, 20);
+TEST_F(TerminalTest, ReceivePacketBasic) {
+    const Packet packet(10, 0, 5, src, dst, TICK);
 
-    Terminal terminal(terminalIP, &router);
-
-    const Packet packet(100, 0, 5, 0, terminalIP, originIP);
-
-    EXPECT_TRUE(terminal.receivePacket(packet));
-    EXPECT_EQ(terminal.getReceivedPackets(), 1);
+    EXPECT_TRUE(trm.receivePacket(packet));
+    EXPECT_EQ(trm.getPacketsReceived(), 1);
+    EXPECT_EQ(trm.getPacketsInPending(), 1);
 }
 
-TEST(TerminalReception, ReceivePacketBufferFull) {
-    Router router{IPAddress{5, 0}};
-    const IPAddress terminalIP(5, 10);
-    const IPAddress originIP(10, 20);
+TEST_F(TerminalTest, ReceivePacketBufferFull) {
+    const Terminal::Config cfg = {3, 12, 7, 8};
+    Terminal terminal(&rtr, TERMINAL_ID, cfg);
 
-    Terminal terminal(terminalIP, &router, 50, 3);
+    EXPECT_TRUE(terminal.receivePacket(Packet(100, 0, 5, src, dst, TICK)));
+    EXPECT_TRUE(terminal.receivePacket(Packet(100, 1, 5, src, dst, TICK)));
+    EXPECT_TRUE(terminal.receivePacket(Packet(100, 2, 5, src, dst, TICK)));
+    EXPECT_EQ(terminal.getPacketsReceived(), 3);
+    EXPECT_EQ(terminal.getPacketsInPending(), 3);
 
-    EXPECT_TRUE(terminal.receivePacket(Packet(100, 0, 5, 0, terminalIP, originIP)));
-    EXPECT_TRUE(terminal.receivePacket(Packet(100, 1, 5, 0, terminalIP, originIP)));
-    EXPECT_TRUE(terminal.receivePacket(Packet(100, 2, 5, 0, terminalIP, originIP)));
-    EXPECT_EQ(terminal.getReceivedPackets(), 3);
-
-    EXPECT_FALSE(terminal.receivePacket(Packet(100, 3, 5, 0, terminalIP, originIP)));
+    EXPECT_FALSE(terminal.receivePacket(Packet(100, 3, 5, src, dst, TICK)));
+    EXPECT_EQ(terminal.getPacketsReceived(), 4);
+    EXPECT_EQ(terminal.getPacketsInPending(), 3);
 }
 
-// =============== Buffer tests ===============
-TEST(TerminalBuffer, ProcessInputBufferCompletePage) {
-    Router router{IPAddress{5, 0}};
-    const IPAddress terminalIP(5, 10);
-    const IPAddress originIP(10, 20);
+// =============== Input buffer processing tests ===============
+TEST_F(TerminalTest, ProcessInputBufferCompletePage) {
+    trm.receivePacket(Packet(100, 0, 3, src, dst, TICK));
+    trm.receivePacket(Packet(100, 1, 3, src, dst, TICK));
+    trm.receivePacket(Packet(100, 2, 3, src, dst, TICK));
 
-    Terminal terminal(terminalIP, &router);
+    trm.processInputBuffer(1);
 
-    terminal.receivePacket(Packet(100, 0, 3, 0, terminalIP, originIP));
-    terminal.receivePacket(Packet(100, 1, 3, 0, terminalIP, originIP));
-    terminal.receivePacket(Packet(100, 2, 3, 0, terminalIP, originIP));
-
-    terminal.processInputBuffer();
-
-    EXPECT_EQ(terminal.getReceivedPages(), 1);
+    EXPECT_EQ(trm.getPagesCompleted(), 1);
+    EXPECT_EQ(trm.getPacketsSuccProcessed(), 3);
+    EXPECT_EQ(trm.getPacketsInPending(), 0);
 }
 
-TEST(TerminalBuffer, ProcessInputBufferIncompletePage) {
-    Router router{IPAddress{5, 0}};
-    const IPAddress terminalIP(5, 10);
-    const IPAddress originIP(10, 20);
+TEST_F(TerminalTest, ProcessInputBufferIncompletePage) {
+    trm.receivePacket(Packet(100, 0, 5, src, dst, TICK));
+    trm.receivePacket(Packet(100, 1, 5, src, dst, TICK));
 
-    Terminal terminal(terminalIP, &router);
+    const size_t proc = trm.processInputBuffer(1);
 
-    terminal.receivePacket(Packet(100, 0, 5, 0, terminalIP, originIP));
-    terminal.receivePacket(Packet(100, 1, 5, 0, terminalIP, originIP));
-
-    terminal.processInputBuffer();
-
-    EXPECT_EQ(terminal.getReceivedPages(), 0);
+    EXPECT_EQ(proc, 2);
+    EXPECT_EQ(trm.getPagesCompleted(), 0);
+    EXPECT_EQ(trm.getPacketsInPending(), 2);
 }
 
-TEST(TerminalBuffer, ProcessInputBufferMultiplePages) {
-    Router router{IPAddress{5, 0}};
-    const IPAddress terminalIP(5, 10);
-    const IPAddress originIP(10, 20);
+TEST_F(TerminalTest, ProcessInputBufferMultiplePages) {
+    trm.receivePacket(Packet(100, 0, 2, src, dst, TICK));
+    trm.receivePacket(Packet(100, 1, 2, src, dst, TICK));
+    trm.receivePacket(Packet(200, 0, 2, src, dst, TICK));
+    trm.receivePacket(Packet(200, 1, 2, src, dst, TICK));
 
-    Terminal terminal(terminalIP, &router);
+    trm.processInputBuffer(1);
 
-    terminal.receivePacket(Packet(100, 0, 2, 0, terminalIP, originIP));
-    terminal.receivePacket(Packet(100, 1, 2, 0, terminalIP, originIP));
-    terminal.receivePacket(Packet(200, 0, 2, 0, terminalIP, originIP));
-    terminal.receivePacket(Packet(200, 1, 2, 0, terminalIP, originIP));
-
-    terminal.processInputBuffer();
-
-    EXPECT_EQ(terminal.getReceivedPages(), 2);
+    EXPECT_EQ(trm.getPagesCompleted(), 2);
+    EXPECT_EQ(trm.getPacketsSuccProcessed(), 4);
+    EXPECT_EQ(trm.getPacketsInPending(), 0);
 }
 
-TEST(TerminalBuffer, ProcessInputBufferOutOfOrder) {
-    Router router{IPAddress{5, 0}};
-    const IPAddress terminalIP(5, 10);
-    const IPAddress originIP(10, 20);
+TEST_F(TerminalTest, ProcessInputBufferOutOfOrder) {
+    trm.receivePacket(Packet(100, 2, 3, src, dst, TICK));
+    trm.receivePacket(Packet(100, 0, 3, src, dst, TICK));
+    trm.receivePacket(Packet(100, 1, 3, src, dst, TICK));
 
-    Terminal terminal(terminalIP, &router);
+    trm.processInputBuffer(1);
 
-    terminal.receivePacket(Packet(100, 2, 3, 0, terminalIP, originIP));
-    terminal.receivePacket(Packet(100, 0, 3, 0, terminalIP, originIP));
-    terminal.receivePacket(Packet(100, 1, 3, 0, terminalIP, originIP));
-
-    terminal.processInputBuffer();
-
-    EXPECT_EQ(terminal.getReceivedPages(), 1);
+    EXPECT_EQ(trm.getPagesCompleted(), 1);
+    EXPECT_EQ(trm.getPacketsSuccProcessed(), 3);
 }
 
-TEST(TerminalBuffer, ProcessInputBufferDuplicatePacket) {
-    Router router{IPAddress{5, 0}};
-    const IPAddress terminalIP(5, 10);
-    const IPAddress originIP(10, 20);
+TEST_F(TerminalTest, ProcessInputBufferDuplicatePacket) {
+    trm.receivePacket(Packet(100, 0, 2, src, dst, TICK));
+    trm.receivePacket(Packet(100, 0, 2, src, dst, TICK));
+    trm.receivePacket(Packet(100, 1, 2, src, dst, TICK));
+    trm.processInputBuffer(1);
 
-    Terminal terminal(terminalIP, &router);
+    EXPECT_EQ(trm.getPagesCompleted(), 1);
+    EXPECT_EQ(trm.getPacketsReceived(), 3);
+    EXPECT_EQ(trm.getPacketsInPending(), 0);
+    EXPECT_EQ(trm.getPacketsInDropped(), 1);
 
-    terminal.receivePacket(Packet(100, 0, 2, 0, terminalIP, originIP));
-    terminal.receivePacket(Packet(100, 1, 2, 0, terminalIP, originIP));
+    trm.receivePacket(Packet(100, 0, 2, src, dst, TICK));
+    trm.processInputBuffer(1);
 
-    terminal.processInputBuffer();
-
-    EXPECT_EQ(terminal.getReceivedPages(), 1);
-
-    terminal.receivePacket(Packet(100, 0, 2, 0, terminalIP, originIP));
-
-    terminal.processInputBuffer();
-
-    EXPECT_EQ(terminal.getReceivedPages(), 1);
+    EXPECT_EQ(trm.getPagesCompleted(), 1);
 }
 
-TEST(TerminalBuffer, ProcessInputBufferWrongDestination) {
-    Router router{IPAddress{5, 0}};
-    const IPAddress terminalIP(5, 10);
+TEST_F(TerminalTest, ProcessInputBufferWrongDestination) {
     const IPAddress wrongIP(8, 20);
-    const IPAddress originIP(10, 20);
 
-    Terminal terminal(terminalIP, &router);
+    trm.receivePacket(Packet(100, 0, 3, src, wrongIP, TICK));
 
-    terminal.receivePacket(Packet(100, 0, 3, 0, wrongIP, originIP));
+    const size_t processed = trm.processInputBuffer(1);
 
-    EXPECT_EQ(terminal.processInputBuffer(), 0);
+    EXPECT_EQ(processed, 1);
+    EXPECT_EQ(trm.getPagesCompleted(), 0);
+    EXPECT_EQ(trm.getPacketsInDropped(), 1);
 }
 
-TEST(TerminalBuffer, ProcessInputBufferBandwidthLimit) {
-    Router router{IPAddress{5, 0}};
-    const IPAddress terminalIP(5, 10);
-    const IPAddress originIP(10, 20);
-
-    Terminal terminal(terminalIP, &router, 50, 100, 4, 2);
+TEST_F(TerminalTest, ProcessInputBufferBandwidthLimit) {
+    const Terminal::Config cfg{0, 2, 0, Terminal::DEF_OUTPUT_BW};
+    Terminal terminal(&rtr, TERMINAL_ID, cfg);
 
     for (int i = 0; i < 5; ++i) {
-        terminal.receivePacket(Packet(100, i, 10, 0, terminalIP, originIP));
+        terminal.receivePacket(Packet(100, i, 10, src, dst, TICK));
     }
 
-    const size_t processed = terminal.processInputBuffer();
+    const size_t processed = terminal.processInputBuffer(1);
     EXPECT_EQ(processed, 2);
+    EXPECT_EQ(terminal.getPacketsInPending(), 5);
 }
 
-TEST(TerminalBuffer, ProcessOutputBuffer) {
-    Router router{IPAddress{5, 0}};
-    const IPAddress terminalIP(5, 10);
-    const IPAddress destIP(10, 20);
+TEST_F(TerminalTest, ProcessInputBufferExpiredPacket) {
+    trm.receivePacket(Packet(100, 0, 3, src, dst, 5));
 
-    Terminal terminal(terminalIP, &router, 100, 100, 3, 100);
+    trm.processInputBuffer(10);
 
-    terminal.sendPage(5, destIP);
+    EXPECT_EQ(trm.getPacketsInTimedOut(), 1);
+    EXPECT_EQ(trm.getPagesCompleted(), 0);
+}
 
-    const size_t sent = terminal.processOutputBuffer();
+// =============== Output buffer processing tests ===============
+TEST_F(TerminalTest, ProcessOutputBufferSendsPackets) {
+    trm.sendPage(3, dst, TICK);
+
+    const size_t sent = trm.processOutputBuffer(1);
+
     EXPECT_EQ(sent, 3);
-    EXPECT_EQ(terminal.getSentPages(), 1);
-    EXPECT_EQ(router.getPacketsReceived(), 3);
+    EXPECT_EQ(trm.getPacketsSent(), 3);
+    EXPECT_EQ(trm.getPacketsOutPending(), 0);
 }
 
-// =============== BW Configuration tests ===============
-TEST(TerminalBW, SetExternalBW) {
-    Router router{IPAddress{5, 0}};
-    const IPAddress terminalIP(5, 10);
+TEST_F(TerminalTest, ProcessOutputBufferBandwidthLimit) {
+    const Terminal::Config cfg{0, Terminal::DEF_INPUT_PROC, 0, 3};
+    Terminal terminal(&rtr, TERMINAL_ID, cfg);
 
-    Terminal terminal(terminalIP, &router);
+    terminal.sendPage(7, dst, TICK);
 
-    terminal.setExternalBW(10);
-
-    EXPECT_EQ(terminal.getExternalBW(), 10);
+    const size_t sent = terminal.processOutputBuffer(1);
+    EXPECT_EQ(sent, 3);
+    EXPECT_EQ(terminal.getPacketsSent(), 3);
+    EXPECT_EQ(terminal.getPacketsOutPending(), 4);
 }
 
-TEST(TerminalBW, SetInternalBW) {
-    Router router{IPAddress{5, 0}};
-    const IPAddress terminalIP(5, 10);
+TEST_F(TerminalTest, ProcessOutputBufferExpiredPackets) {
+    trm.sendPage(3, dst, 5);
 
-    Terminal terminal(terminalIP, &router);
+    const size_t sent = trm.processOutputBuffer(10);
 
-    terminal.setInternalBW(20);
+    EXPECT_EQ(sent, 0);
+    EXPECT_EQ(trm.getPacketsSent(), 0);
+    EXPECT_EQ(trm.getPacketsOutTimedOut(), 3);
+}
 
-    EXPECT_EQ(terminal.getInternalBW(), 20);
+// =============== Setter tests ===============
+TEST_F(TerminalTest, SetExternalBW) {
+    trm.setExternalBW(10);
+    EXPECT_EQ(trm.getOutputBW(), 10);
+}
+
+TEST_F(TerminalTest, SetInternalProc) {
+    trm.setInternalProc(20);
+    EXPECT_EQ(trm.getInternalProc(), 20);
 }
 
 // =============== Utilities tests ===============
-TEST(TerminalUtilities, ToString) {
-    Router router{IPAddress{5, 0}};
-    const IPAddress terminalIP(5, 10);
-
-    const Terminal terminal(terminalIP, &router);
-
-    std::string str = terminal.toString();
-
-    EXPECT_NE(str.find("5.10"), std::string::npos);
+TEST_F(TerminalTest, ToString) {
+    const std::string str = trm.toString();
     EXPECT_NE(str.find("Terminal"), std::string::npos);
+    EXPECT_NE(str.find("5"), std::string::npos);
 }
 
-// =============== Complex tests ===============
-TEST(TerminalComplex, ComplexScenario) {
-    Router router{IPAddress{5, 0}};
-    const IPAddress terminalIP(5, 10);
-    const IPAddress originIP(10, 20);
+// =============== Tick / Quarantine tests ===============
+TEST_F(TerminalTest, TickProcessesBothBuffers) {
+    trm.sendPage(2, dst, TICK);
+    trm.receivePacket(Packet(200, 0, 2, src, dst, TICK));
+    trm.receivePacket(Packet(200, 1, 2, src, dst, TICK));
 
-    Terminal terminal(terminalIP, &router);
+    trm.tick(1);
 
-    for (int i = 0; i < 5; ++i) {
-        terminal.sendPage(10, IPAddress(10, 20));
-    }
+    EXPECT_EQ(trm.getPacketsSent(), 2);
+    EXPECT_EQ(trm.getPagesCompleted(), 1);
+}
 
-    terminal.receivePacket(Packet(100, 0, 5, 0, terminalIP, originIP));
-    terminal.receivePacket(Packet(100, 1, 5, 0, terminalIP, originIP));
-    terminal.receivePacket(Packet(200, 0, 3, 0, terminalIP, originIP));
-    terminal.receivePacket(Packet(200, 1, 3, 0, terminalIP, originIP));
-    terminal.receivePacket(Packet(200, 2, 3, 0, terminalIP, originIP));
+TEST_F(TerminalTest, ReassemblerTimeout_SetsQuarantine) {
+    trm.receivePacket(Packet(500, 0, 10, src, dst, TICK));
+    trm.processInputBuffer(1);
 
-    for (int i = 0; i < 10; ++i) {
-        terminal.tick();
-    }
+    trm.tick(TICK + MAX_ASSEMBLER_TTL + 1);
 
-    EXPECT_EQ(terminal.getSentPages(), 5);
-    EXPECT_EQ(terminal.getReceivedPages(), 1);
+    EXPECT_EQ(trm.getPagesTimedOut(), 1);
+    EXPECT_EQ(trm.getPacketsInTimedOut(), 1);
+
+    const bool accepted = trm.receivePacket(Packet(500, 1, 10, src, dst, TICK));
+    EXPECT_FALSE(accepted);
+    EXPECT_EQ(trm.getPacketsInTimedOut(), 2);
+}
+
+TEST_F(TerminalTest, QuarantineExpires_AcceptsPacketAgain) {
+    trm.receivePacket(Packet(500, 0, 10, src, dst, TICK));
+    trm.processInputBuffer(1);
+
+    trm.tick(TICK + MAX_ASSEMBLER_TTL + 1);
+
+    trm.tick(2 * TICK + MAX_ASSEMBLER_TTL + 1);
+
+    const bool accepted = trm.receivePacket(Packet(500, 1, 10, src, dst, TICK));
+    EXPECT_TRUE(accepted);
+}
+
+// =============== Complex scenario ===============
+TEST_F(TerminalTest, ComplexScenario_SendAndReceive) {
+    trm.sendPage(5, dst, TICK);
+    trm.sendPage(5, dst, TICK);
+    trm.sendPage(5, dst, TICK);
+
+    EXPECT_EQ(trm.getPagesCreated(), 3);
+    EXPECT_EQ(trm.getPacketsOutPending(), 15);
+
+    for (int i = 0; i < 3; ++i) trm.receivePacket(Packet(100, i, 3, src, dst, TICK));
+    for (int i = 0; i < 3; ++i) trm.receivePacket(Packet(200, i, 3, src, dst, TICK));
+
+    trm.tick(1);
+
+    EXPECT_EQ(trm.getPagesCompleted(), 2);
+    EXPECT_EQ(trm.getPacketsSent(), 5);
 }
