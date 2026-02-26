@@ -10,8 +10,8 @@ class Router;
 /**
  * @class DijkstraAlgorithm
  * @brief Implements Dijkstra's shortest path algorithm for network routing.
- * 
- * Calculates shortest paths between routers and generates routing tables.
+ *
+ * Calculates the shortest paths between routers and generates routing tables.
  */
 class DijkstraAlgorithm {
     static constexpr size_t INF = std::numeric_limits<size_t>::max();
@@ -31,7 +31,7 @@ class DijkstraAlgorithm {
 public:
     /**
      * @brief Computes shortest paths from a source router to all others.
-     * 
+     *
      * @param routers List of all routers in the network.
      * @param sourceIP IP of the source router.
      * @return Routing table for the source router.
@@ -41,7 +41,7 @@ public:
 
     /**
      * @brief Computes routing tables for all routers in the network.
-     * 
+     *
      * @param routers List of all routers.
      * @param tables Output list of routing tables (cleared first).
      */
@@ -50,7 +50,7 @@ public:
 private:
     /**
      * @brief Finds the unvisited router with minimum distance.
-     * 
+     *
      * @param distances Array of distance information.
      * @param routerCount Number of routers.
      * @return Index of minimum distance router, or -1 if none found.
@@ -58,8 +58,8 @@ private:
     static size_t findMinDistance(const List<DistanceInfo>& distances, size_t routerCount);
 
     /**
-     * @brief Gets index of router in list.
-     * 
+     * @brief Gets index of router in a list.
+     *
      * @param routers List of routers.
      * @param routerIP IP to find.
      * @return Index, or -1 if not found.
