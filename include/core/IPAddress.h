@@ -235,3 +235,12 @@ constexpr bool IPAddress::operator>(const IPAddress& other) const noexcept {
 constexpr bool IPAddress::operator>=(const IPAddress& other) const noexcept {
     return address >= other.address;
 }
+
+/** @cond */
+template <>
+struct std::hash<IPAddress> {
+    size_t operator()(const IPAddress& ip) const noexcept {
+        return std::hash<uint16_t>{}(ip.getRawAddress());
+    }
+};
+/** @endcond */
