@@ -347,6 +347,12 @@ public:
      */
     [[nodiscard]] const Terminal* getTerminal(IPAddress ip) const noexcept;
 
+    /**
+     * @brief Gets the IP addresses of all connected neighbor routers.
+     * @return List of neighbor router IP addresses.
+     */
+    [[nodiscard]] List<IPAddress> getNeighborIPs() const;
+
     // =============== Utilities ===============
     /**
      * @brief Gets string representation.
@@ -464,7 +470,6 @@ inline size_t Router::getPacketsInPending() const noexcept {
 inline size_t Router::getPacketsLocPending() const noexcept {
     return locBuffer.size();
 }
-
 
 inline size_t Router::getLocalBufferUsage() const noexcept {
     return locBuffer.size();

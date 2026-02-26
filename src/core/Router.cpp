@@ -169,11 +169,19 @@ size_t Router::getNeighborBufferUsage(IPAddress neighborIP) const {
     return 0;
 }
 
-[[nodiscard]] const Terminal* Router::getTerminal(IPAddress ip) const noexcept {
+const Terminal* Router::getTerminal(IPAddress ip) const noexcept {
     if (const auto it = terminals.find(ip); it != terminals.end()) {
         return it->second.get();
     }
     return nullptr;
+}
+
+List<IPAddress> Router::getNeighborIPs() const {
+    List<IPAddress> ips;
+    for (const auto& ip : connections | std::views::keys) {
+        ips.pushBack(ip);
+    }
+    return ips;
 }
 
 std::string Router::toString() const {
