@@ -1,40 +1,122 @@
 #pragma once
 
-#include <memory>
-#include "IPAddress.h"
+#include <numeric>
+#include <vector>
+
 #include "PacketBuffer.h"
-#include "Page.h"
 #include "PageReassembler.h"
 
 class Router;  // Forward declaration
 
+/**
+ * @class Terminal
+ * @brief Represents a network terminal that can send and receive pages through a connected router.
+ */
 class Terminal {
-    IPAddress ip;            /**< IP address of the terminal */
-    Router* connectedRouter; /**< Pointer to the router connected to the terminal */
+public:
+    static constexpr size_t DEF_INPUT_PROC =
+        10; /**< Default input processing rate for the terminal */
+    static constexpr size_t DEF_OUTPUT_BW = 5; /**< Default output bandwidth for the terminal */
+    static constexpr size_t DEF_OUT_BUF_CAP =
+        0; /**< Default output buffer capacity for the terminal */
+    static constexpr size_t DEF_IN_BUF_CAP =
+        0; /**< Default input buffer capacity for the terminal */
 
-    PacketBuffer outputBuffer;          /**< Priority queue for outgoing packets */
-    PacketBuffer inputBuffer;           /**< FIFO queue for incoming packets */
-    List<PageReassembler> reassemblers; /**< Active page reassemblers */
+    /**
+     * @struct Config
+     * @brief Represents configuration settings for buffering and processing in a system.
+     *
+     * This structure is used to define the capacity of input and output buffers, as well
+     * as the bandwidth and processing constraints.
+     */
+    struct Config {
+        size_t inBufferCap; /**< Input buffer capacity for the terminal */
+        size_t inProcCap;   /**< Input processing rate, packets that can be processed from the input
+                               buffer per cycle */
+        size_t outBufferCap; /**< Output buffer capacity for the terminal */
+        size_t outputBW; /**< Output bandwidth, number of packets that can be sent to the router per
+                            cycle */
 
-    size_t externalBW; /**< Packets per cycle to router (default 4) */
-    size_t internalBW; /**< Packets per cycle from input buffer (default 8) */
+        /**
+         * @brief Default constructor for Config, initializes with default values.
+         */
+        Config()
+            : inBufferCap(DEF_IN_BUF_CAP),
+              inProcCap(DEF_INPUT_PROC),
+              outBufferCap(DEF_OUT_BUF_CAP),
+              outputBW(DEF_OUTPUT_BW) {}
 
-    size_t sentPages;       /**< Total pages successfully sent */
-    size_t receivedPackets; /**< Total packets received (for stats) */
-    size_t receivedPages;   /**< Total pages successfully received */
-    size_t nextPageID;      /**< ID for the next page to be sent */
+        /**
+         * @brief Parameterized constructor for Config struct that allows custom settings.
+         * @param inBufferCap Input buffer capacity.
+         * @param inProcCap Input processing rate (packets per cycle).
+         * @param outBufferCap Output buffer capacity.
+         * @param outputBW Output bandwidth (packets per cycle).
+         */
+        Config(size_t inBufferCap, size_t inProcCap, size_t outBufferCap, size_t outputBW)
+            : inBufferCap(inBufferCap),
+              inProcCap(inProcCap),
+              outBufferCap(outBufferCap),
+              outputBW(outputBW) {}
+    };
+
+private:
+    /**
+     * @struct QuarantinedID
+     * @brief Represents a page ID currently quarantined due to an expired reassembler.
+     *
+     * Stores the page ID and the current system tick when this quarantine entry expires. While a
+     * page ID is in quarantine, any incoming packets with that page ID should be dropped until the
+     * quarantine expires.
+     */
+    struct QuarantinedID {
+        size_t pageID;  /**< ID of the discarded page */
+        size_t expTick; /**< System tick when this quarantine entry expires */
+    };
+    /**< List of active page reassemblers currently processing incoming packets */
+    using AssemblerList   = std::vector<PageReassembler>;
+    /**< List of page IDs that are currently quarantined due to expired reassemblers */
+    using QuarantinedList = std::vector<QuarantinedID>;
+
+    IPAddress terminalIP; /**< IP address of the terminal */
+    Router* rtrConn;      /**< Pointer to the router connected to the terminal */
+
+    PacketBuffer inBuffer;  /**< Queue for incoming packets */
+    size_t inProcCap;       /**< Packets per cycle able to process from the input buffer */
+    PacketBuffer outBuffer; /**< Queue for outgoing packets */
+    size_t outBW;           /**< Packets per cycle able to send to router */
+
+    AssemblerList reassemblers; /**< Active page reassemblers */
+
+    size_t pagesCreated;    /**< Total pages created and sent by this terminal */
+    size_t pagesSent;       /**< Total pages sent to router */
+    size_t pagesOutDropped; /**< Total pages dropped due to output buffer overflow */
+    size_t pagesCompleted;  /**< Total pages successfully reassembled by the terminal */
+    size_t pagesTimedOut;   /**< Total pages dropped due to expired reassemblers */
+
+    size_t packetsGenerated;   /**< Total packets generated by this terminal */
+    size_t packetsSent;        /**< Total packets sent to router */
+    size_t packetsOutDropped;  /**< Total packets dropped due to output buffer overflow */
+    size_t packetsOutTimedOut; /**< Total packets dropped due to expiration while in the output
+                                  buffer */
+
+    size_t packetsReceived;   /**< Total packets received from router */
+    size_t packetsInTimedOut; /**< Total packets dropped due to expired packets or reassemblers */
+    size_t packetsInDropped;  /**< Total packets dropped due to input buffer overflow */
+    size_t packetsSuccProcessed; /**< Total packets successfully reassembled into pages */
+
+    size_t nextPageID; /**< ID for the next page to be sent */
+
+    QuarantinedList quarantine; /**< List of page IDs that are currently quarantined due to expired
+                                   reassemblers */
 public:
     /**
      * @brief Constructor for Terminal.
-     * @param ip Terminal's IP address.
+     * @param terminalID Terminal's unique ID within the router (must be > 0).
      * @param router Pointer to connected router.
-     * @param outputCapacity Output buffer capacity (default 50).
-     * @param inputCapacity Input buffer capacity (default 100).
-     * @param externalBW Packets per cycle to router (default 4).
-     * @param internalBW Packets per cycle from input (default 8).
+     * @param cfg Configuration struct for bandwidth and buffer settings (optional).
      */
-    Terminal(IPAddress ip, Router* router, size_t outputCapacity = 0, size_t inputCapacity = 0, size_t externalBW = 4,
-             size_t internalBW = 8);
+    Terminal(Router* router, uint8_t terminalID, const Config& cfg = Config{});
 
     /**
      * @brief Destructor - cleans up all active reassemblers.
@@ -48,6 +130,7 @@ public:
 
     /**
      * @brief Copy assignment operator - deleted to prevent copying.
+     * @return Reference to this terminal.
      */
     Terminal& operator=(const Terminal&) = delete;
 
@@ -58,79 +141,73 @@ public:
 
     /**
      * @brief Move assignment operator - deleted to prevent moving.
+     * @return Reference to this terminal.
      */
     Terminal& operator=(Terminal&&) = delete;
 
+    // =============== Transmission ===============
     /**
      * @brief Creates a page and fragments it into packets for transmission.
      *
-     * @param length Number of packets in the page (must be > 0).
+     * Checks if the output buffer has enough space for all packets. If not, the page is dropped and
+     * statistics are updated. If successful, packets are enqueued in the output buffer and
+     * statistics are updated.
+     *
+     * @param length Number of packets on the page (must be > 0).
      * @param destIP Destination IP address.
-     * @return true if all packets were enqueued, false if some were dropped.
+     * @param expTick System tick when the packets should expire.
+     * @return true if the page was successfully created and enqueued, false if dropped due to
+     * insufficient buffer space.
      */
-    bool sendPage(size_t length, IPAddress destIP);
+    bool sendPage(size_t length, IPAddress destIP, size_t expTick);
 
     /**
      * @brief Receives a packet from the network.
      *
      * @param packet The packet to receive.
-     * @return true if packet was buffered, false if dropped (buffer full).
+     * @return true if a packet was buffered, false if dropped due to quarantine or input buffer
+     * overflow.
      */
     bool receivePacket(const Packet& packet);
 
+    // =============== Processing ===============
     /**
-     * @brief Main tick function - call once per simulation cycle.
-     *
-     * Executes in order:
-     * 1. Process output buffer (send to router)
-     * 2. Process input buffer (reassemble pages)
-     * 3. Tick all reassemblers (decrement TTL) - Not yet implemented
-     * 4. Cleanup expired reassemblers - Not yet implemented
+     * @brief Processes up to internalProc packets from the input buffer, attempting to reassemble
+     * pages.
+     * @param currentTick The current system tick for processing timeouts and expirations.
+     * @return Number of packets actually processed.
      */
-    void tick();
+    size_t processInputBuffer(size_t currentTick);
 
     /**
-     * @brief Sends up to externalBW packets from output buffer to router.
-     * @return Number of packets actually sent.
+     * @brief Processes up to outBW packets from the output buffer, sending them to the connected
+     * router.
+     * @param currentTick The current system tick for processing timeouts and expirations.
+     * @return Number of packets actually sent to the router.
      */
-    size_t processOutputBuffer();
+    size_t processOutputBuffer(size_t currentTick);
 
     /**
-     * @brief Processes up to internalBW packets from input buffer.
-     * @return Number of packets processed.
+     * @brief Advances the terminal's state by one tick, processing input and output buffers and
+     * updating reassemblers and quarantine.
+     * @param currentTick The current system tick for processing timeouts and expirations.
      */
-    size_t processInputBuffer();
+    void tick(size_t currentTick);
 
+    // =============== Setters ===============
     /**
-     * @brief Sets external bandwidth (packets per cycle to router).
+     * @brief Sets external bandwidth.
      * @param bw New bandwidth value.
      */
     void setExternalBW(size_t bw) noexcept;
 
     /**
-     * @brief Sets internal bandwidth (packets per cycle from input).
-     * @param bw New bandwidth value.
+     * @brief Sets internal processing capacity.
+     * @param capacity New bandwidth value.
      */
-    void setInternalBW(size_t bw) noexcept;
+    void setInternalProc(size_t capacity) noexcept;
 
-    /**
-     * @brief Gets the number of packets received (for statistics).
-     * @return Number of packets received.
-     */
-    [[nodiscard]] size_t getReceivedPackets() const noexcept;
-
-    /**
-     * @brief Gets the number of pages received.
-     * @return Number of pages received.
-     */
-    [[nodiscard]] size_t getReceivedPages() const noexcept;
-
-    /**
-     * @brief Gets the number of pages sent.
-     * @return Number of pages sent.
-     */
-    [[nodiscard]] size_t getSentPages() const noexcept;
-
+    // =============== Getters ===============
     /**
      * @brief Gets the terminal's IP address.
      * @return Terminal's IP address.
@@ -138,16 +215,106 @@ public:
     [[nodiscard]] IPAddress getTerminalIP() const noexcept;
 
     /**
-     * @brief Gets the external bandwidth (packets per cycle to router).
+     * @brief Gets the output bandwidth.
      * @return External bandwidth value.
      */
-    [[nodiscard]] size_t getExternalBW() const noexcept;
+    [[nodiscard]] size_t getOutputBW() const noexcept;
 
     /**
-     * @brief Gets the internal bandwidth (packets per cycle from input).
+     * @brief Gets the internal processing capacity.
      * @return Internal bandwidth value.
      */
-    [[nodiscard]] size_t getInternalBW() const noexcept;
+    [[nodiscard]] size_t getInternalProc() const noexcept;
+
+    /**
+     * @brief Gets the total number of pages created and sent by this terminal.
+     * @return Total pages created.
+     */
+    [[nodiscard]] size_t getPagesCreated() const noexcept;
+
+    /**
+     * @brief Gets the total number of pages sent to the router.
+     * @return Total pages sent.
+     */
+    [[nodiscard]] size_t getPagesSent() const noexcept;
+
+    /**
+     * @brief Gets the total number of pages dropped due to output buffer overflow.
+     * @return Total pages dropped.
+     */
+    [[nodiscard]] size_t getPagesDropped() const noexcept;
+
+    /**
+     * @brief Gets the total number of pages successfully reassembled by the terminal.
+     * @return Total pages completed.
+     */
+    [[nodiscard]] size_t getPagesCompleted() const noexcept;
+
+    /**
+     * @brief Gets the total number of pages dropped due to expired reassemblers.
+     * @return Total pages timed out.
+     */
+    [[nodiscard]] size_t getPagesTimedOut() const noexcept;
+
+    /**
+     * @brief Gets the total number of packets generated by this terminal.
+     * @return Total packets generated.
+     */
+    [[nodiscard]] size_t getPacketsGenerated() const noexcept;
+
+    /**
+     * @brief Gets the total number of packets sent to the router.
+     * @return Total packets sent.
+     */
+    [[nodiscard]] size_t getPacketsSent() const noexcept;
+
+    /**
+     * @brief Gets the total number of packets dropped due to output buffer overflow.
+     * @return Total packets dropped.
+     */
+    [[nodiscard]] size_t getPacketsOutDropped() const noexcept;
+
+    /**
+     * @brief Gets the total number of packets dropped due to expiration while in the output buffer.
+     * @return Total packets timed out in the output buffer.
+     */
+    [[nodiscard]] size_t getPacketsOutTimedOut() const noexcept;
+
+    /**
+     * @brief Gets the number of packets currently pending in the output buffer.
+     * @return Number of packets pending in the output buffer.
+     */
+    [[nodiscard]] size_t getPacketsOutPending() const noexcept;
+
+    /**
+     * @brief Gets the total number of packets received from the router.
+     * @return Total packets received.
+     */
+    [[nodiscard]] size_t getPacketsReceived() const noexcept;
+
+    /**
+     * @brief Gets the total number of packets dropped due to expired packets or reassemblers.
+     * @return Total packets dropped on input.
+     */
+    [[nodiscard]] size_t getPacketsInTimedOut() const noexcept;
+
+    /**
+     * @brief Gets the total number of packets dropped due to input buffer overflow.
+     * @return Total packets dropped on input.
+     */
+    [[nodiscard]] size_t getPacketsInDropped() const noexcept;
+
+    /**
+     * @brief Gets the total number of packets successfully reassembled into pages.
+     * @return Total packets successfully processed.
+     */
+    [[nodiscard]] size_t getPacketsSuccProcessed() const noexcept;
+
+    /**
+     * @brief Gets the number of packets currently pending in the input buffer and reassemblers.
+     * @return Number of packets pending on input.
+     */
+    [[nodiscard]] size_t getPacketsInPending() const noexcept;
 
     /**
      * @brief Generates a string representation of the terminal, including its IP address.
@@ -156,57 +323,132 @@ public:
     [[nodiscard]] std::string toString() const;
 
     /**
-     * @brief Stream output operator.
+     * @brief Stream output operator for Terminal.
+     * @param os Output stream to write to.
+     * @param terminal The terminal to output.
+     * @return Reference to the output stream.
      */
     friend std::ostream& operator<<(std::ostream& os, const Terminal& terminal);
 
 private:
-    // ===== Private helpers =====
+    // =============== Private helpers ===============
     /**
-     * @brief Finds existing reassembler or creates new one.
-     * @return Pointer to reassembler, or nullptr on failure.
+     * @brief Finds an existing reassembler for the given page ID or creates a new one if it doesn't
+     * exist.
+     * @param pageID ID of the page being reassembled.
+     * @param pageLength Total number of packets expected for the page.
+     * @param expTick System tick when the reassembler should expire.
+     * @return Pointer to the found or created PageReassembler, or nullptr if a reassembler exists
+     * but has a different expected page length.
      */
-    PageReassembler* findOrCreateReassembler(int pageID, int pageLength);
+    PageReassembler* findOrCreateReassembler(size_t pageID, size_t pageLength, size_t expTick);
 
     /**
-     * @brief Handles a completed page.
+     * @brief Handles a completed page by packaging it and updating statistics.
+     * @param pageID ID of the completed page.
      */
-    void handleCompletedPage(PageReassembler* reassembler);
+    void handleCompletedPage(size_t pageID);
 
     /**
-     * @brief Removes specific reassembler from list.
+     * @brief Cleans up expired reassemblers and updates statistics and quarantine list accordingly.
+     * @param currentTick The current system tick for processing expirations.
      */
-    void removeReassembler(const PageReassembler* reassembler);
+    void cleanupReassemblers(size_t currentTick);
+
+    /**
+     * @brief Updates the quarantine list by removing expired entries.
+     * @param currentTick The current system tick for processing expirations.
+     */
+    void updateQuarantine(size_t currentTick);
+
+    /**
+     * @brief Checks if a given page ID is currently quarantined.
+     * @param id Page ID to check.
+     * @return true if the page ID is in quarantine, false otherwise.
+     */
+    bool isIDQuarantined(size_t id) const;
 };
 
-inline size_t Terminal::getReceivedPackets() const noexcept {
-    return receivedPackets;
+inline size_t Terminal::getPagesCreated() const noexcept {
+    return pagesCreated;
 }
 
-inline size_t Terminal::getReceivedPages() const noexcept {
-    return receivedPages;
+inline size_t Terminal::getPagesSent() const noexcept {
+    return pagesSent;
 }
 
-inline size_t Terminal::getSentPages() const noexcept {
-    return sentPages;
+inline size_t Terminal::getPagesDropped() const noexcept {
+    return pagesOutDropped;
+}
+
+inline size_t Terminal::getPagesCompleted() const noexcept {
+    return pagesCompleted;
+}
+
+inline size_t Terminal::getPagesTimedOut() const noexcept {
+    return pagesTimedOut;
+}
+
+inline size_t Terminal::getPacketsGenerated() const noexcept {
+    return packetsGenerated;
+}
+
+inline size_t Terminal::getPacketsSent() const noexcept {
+    return packetsSent;
+}
+
+inline size_t Terminal::getPacketsOutDropped() const noexcept {
+    return packetsOutDropped;
+}
+
+inline size_t Terminal::getPacketsOutTimedOut() const noexcept {
+    return packetsOutTimedOut;
+}
+
+inline size_t Terminal::getPacketsOutPending() const noexcept {
+    return outBuffer.size();
+}
+
+inline size_t Terminal::getPacketsReceived() const noexcept {
+    return packetsReceived;
+}
+
+inline size_t Terminal::getPacketsInTimedOut() const noexcept {
+    return packetsInTimedOut;
+}
+
+inline size_t Terminal::getPacketsInDropped() const noexcept {
+    return packetsInDropped;
+}
+
+inline size_t Terminal::getPacketsSuccProcessed() const noexcept {
+    return packetsSuccProcessed;
+}
+
+inline size_t Terminal::getPacketsInPending() const noexcept {
+    const size_t pending = std::accumulate(
+        reassemblers.begin(), reassemblers.end(), 0,
+        [](const size_t sum, const PageReassembler& r) { return sum + r.getReceivedPackets(); });
+
+    return pending + inBuffer.size();
 }
 
 inline IPAddress Terminal::getTerminalIP() const noexcept {
-    return ip;
+    return terminalIP;
 }
 
-inline size_t Terminal::getExternalBW() const noexcept {
-    return externalBW;
+inline size_t Terminal::getOutputBW() const noexcept {
+    return outBW;
 }
 
-inline size_t Terminal::getInternalBW() const noexcept {
-    return internalBW;
+inline size_t Terminal::getInternalProc() const noexcept {
+    return inProcCap;
 }
 
 inline void Terminal::setExternalBW(size_t bw) noexcept {
-    externalBW = bw;
+    outBW = bw;
 }
 
-inline void Terminal::setInternalBW(size_t bw) noexcept {
-    internalBW = bw;
+inline void Terminal::setInternalProc(size_t capacity) noexcept {
+    inProcCap = capacity;
 }
