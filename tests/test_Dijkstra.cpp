@@ -109,12 +109,12 @@ TEST_F(DijkstraTestFixture, TriangleTopology) {
 
     // Simulate some traffic in R1->R2
     for (int i = 0; i < 3; i++) {
-        r1->receivePacket(Packet(10, i, 4, 0, r2->getIP(), r1->getIP()));
+        r1->receivePacket(Packet(10, i, 4, r1->getIP(), r2->getIP(), 10));
     }
     auto rt = RoutingTable();
     rt.setNextHopIP(r2->getIP(), r2->getIP());  // Force R1 to route to R2 directly
-    r1->setRoutingTable(rt);
-    r1->processInputBuffer();
+    r1->setRoutingTable(std::move(rt));
+    r1->processInputBuffer(1);
 
     // Calculate routes from R1
     RoutingTable table = DijkstraAlgorithm::computeRoutingTable(pRouters, r1->getIP());
@@ -152,7 +152,7 @@ TEST_F(DijkstraTestFixture, StarTopology) {
     EXPECT_EQ(table2.getNextHopIP(r4->getIP()), r1->getIP());
 }
 
-// =============== Tests de Cuadrado ===============
+// =============== Square topology tests ===============
 TEST_F(DijkstraTestFixture, SquareTopology) {
     // Topology:  R1 -- R2
     //            |     |
@@ -196,20 +196,20 @@ TEST_F(DijkstraTestFixture, ComplexDiamondTopology) {
     // Simulate congestion on R1->R4
     RoutingTable rt1;
     rt1.setNextHopIP(r4->getIP(), r4->getIP());
-    r1->setRoutingTable(rt1);
+    r1->setRoutingTable(std::move(rt1));
     for (int i = 0; i < 20; i++) {
-        r1->receivePacket(Packet(10, i, 20, 0, r4->getIP(), r1->getIP()));
+        r1->receivePacket(Packet(10, i, 20, r1->getIP(), r4->getIP(), 10));
     }
-    r1->processInputBuffer();
+    r1->processInputBuffer(1);
 
     // Simulate moderate congestion on R2->R4
     RoutingTable rt2;
     rt2.setNextHopIP(r4->getIP(), r4->getIP());
-    r2->setRoutingTable(rt2);
+    r2->setRoutingTable(std::move(rt2));
     for (int i = 0; i < 5; i++) {
-        r2->receivePacket(Packet(10, i, 5, 0, r4->getIP(), r2->getIP()));
+        r2->receivePacket(Packet(10, i, 5, r2->getIP(), r4->getIP(), 10));
     }
-    r2->processInputBuffer();
+    r2->processInputBuffer(1);
 
     RoutingTable table = DijkstraAlgorithm::computeRoutingTable(pRouters, r1->getIP());
     EXPECT_EQ(table.getNextHopIP(r4->getIP()), r3->getIP());
