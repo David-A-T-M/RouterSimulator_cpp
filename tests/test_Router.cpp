@@ -332,7 +332,7 @@ TEST_F(RouterTest, Tick_FullCycle) {
 
 TEST_F(RouterTest, Tick_TerminalsAreTicked) {
     connectAndRoute();
-    auto t = std::make_unique<Terminal>(&rtr1, 10);
+    auto t       = std::make_unique<Terminal>(&rtr1, 10);
     Terminal* t1 = t.get();
     rtr1.connectTerminal(std::move(t));
 

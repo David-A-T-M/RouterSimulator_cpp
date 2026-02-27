@@ -151,7 +151,8 @@ TEST_F(PacketTest, StreamOperator_Multiple) {
     oss << p1 << " | " << p2;
 
     EXPECT_EQ(oss.str(),
-              "Src: 020.015 -> Dst: 010.005 | ID: 000010-0/5 | Src: 020.015 -> Dst: 010.005 | ID: 000020-1/5");
+              "Src: 020.015 -> Dst: 010.005 | ID: 000010-0/5 | Src: 020.015 -> Dst: 010.005 | ID: "
+              "000020-1/5");
 }
 
 // =============== Comparison tests ===============

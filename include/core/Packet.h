@@ -11,17 +11,16 @@ constexpr size_t PACKET_TTL = 100;
  * @class Packet
  * @brief Represents a packet that forms part of a page.
  *
- * Stores all the information from the page it belongs to, including its position
- * within the page, and a priority assigned by the router. This priority is used to
- * determine the packet's transmission priority. Packets are the fundamental units
- * used by routers for data transmission.
+ * Stores all the information from the page it belongs to, including its position within the page,
+ * and a priority assigned by the router. This priority is used to determine the packet's
+ * transmission priority. Packets are the fundamental units used by routers for data transmission.
  */
 class Packet {
-    size_t pageID;   /**< ID of the page that the packet belongs to. */
-    size_t pagePos;  /**< Position of the packet in the page. */
-    size_t pageLen;  /**< Length of the page. */
-    size_t expTick;  /**< The simulation tick at which the packet should expire. */
-    IPAddress srcIP; /**< Reference to the origin terminal IP. */
+    size_t pageID;   /**< ID of the page this packet belongs to. */
+    size_t pagePos;  /**< Position of this packet within the page. */
+    size_t pageLen;  /**< Total number of packets on the page. */
+    size_t expTick;  /**< Simulation tick at which this packet should expire. */
+    IPAddress srcIP; /**< Reference to the source terminal IP. */
     IPAddress dstIP; /**< Reference to the destination terminal IP. */
 
 public:
@@ -29,16 +28,22 @@ public:
     /**
      * @brief Constructor for creating a packet.
      *
-     * @param pageID ID of the page that the packet belongs to.
-     * @param pagePos Position of the packet in the page (0-based, must be < pageLength).
-     * @param pageLen Total length of the page (must be > 0).
-     * @param srcIP Origin terminal IP address.
-     * @param dstIP Destination terminal IP address.
-     * @param expTick The simulation tick at which the packet should expire.
+     * The constructor initializes a packet with the given page information, source and destination
+     * IPs, and expiration tick. It validates the parameters to ensure they are consistent with the
+     * expected values for a packet.
      *
-     * @throws std::invalid_argument if parameters are invalid.
+     * @param pageID ID of the page this packet belongs to.
+     * @param pagePos Position of this packet within the page [0, pageLen-1].
+     * @param pageLen Total number of packets in the page (must be > 0).
+     * @param srcIP Source terminal IP address.
+     * @param dstIP Destination terminal IP address.
+     * @param expTick Simulation tick at which this packet should expire.
+     *
+     * @throws std::invalid_argument if pagePos is out of range, if pageLen is 0, or if srcIP/dstIP
+     * are invalid.
      */
-    Packet(size_t pageID, size_t pagePos, size_t pageLen, IPAddress srcIP, IPAddress dstIP, size_t expTick);
+    Packet(size_t pageID, size_t pagePos, size_t pageLen, IPAddress srcIP, IPAddress dstIP,
+           size_t expTick);
 
     /**
      * @brief Default Copy Constructor.
@@ -52,13 +57,15 @@ public:
 
     /**
      * @brief Default Copy Assignment Operator.
-     * @return Reference to this packet after assignment.
+     *
+     * @return Reference to this packet after the copy assignment.
      */
     Packet& operator=(const Packet&) = default;
 
     /**
      * @brief Default Move Assignment Operator.
-     * @return Reference to this packet after move assignment.
+     *
+     * @return Reference to this packet after the move assignment.
      */
     Packet& operator=(Packet&&) noexcept = default;
 
@@ -70,77 +77,93 @@ public:
     // =============== Getters ===============
     /**
      * @brief Gets the page ID.
-     * @return Page ID.
+     *
+     * @return Page ID that this packet belongs to.
      */
     [[nodiscard]] size_t getPageID() const noexcept;
 
     /**
      * @brief Gets the position of this packet within its page.
-     * @return Page position (0-based).
+     *
+     * @return Position of this packet in the page (0-based index).
      */
     [[nodiscard]] size_t getPagePos() const noexcept;
 
     /**
-     * @brief Gets the total length of the page this packet belongs to.
-     * @return Page length.
+     * @brief Gets the total number of packets in the page.
+     *
+     * @return Total number of packets in the page.
      */
     [[nodiscard]] size_t getPageLen() const noexcept;
 
     /**
-     * @brief Gets the origin IP address.
-     * @return Origin terminal IP.
+     * @brief Gets the source IP address.
+     *
+     * @return Source terminal IP address from which this packet originated.
      */
     [[nodiscard]] IPAddress getSrcIP() const noexcept;
 
     /**
      * @brief Gets the destination IP address.
-     * @return Destination terminal IP.
+     *
+     * @return Destination terminal IP address to which this packet is being sent.
      */
     [[nodiscard]] IPAddress getDstIP() const noexcept;
 
     /**
-     * @brief Gets the expiration tick of the packet.
-     * @return Expiration tick.
+     * @brief Gets the expiration tick for this packet.
+     *
+     * @return Simulation tick at which this packet should expire and be dropped if not delivered.
      */
     [[nodiscard]] size_t getExpTick() const noexcept;
 
     // =============== Query Methods ===============
     /**
      * @brief Checks if this is the first packet in the page.
-     * @return true if pagePosition == 0.
+     *
+     * @return true if pagePosition == 0, indicating this is the first packet of the page.
      */
     [[nodiscard]] bool isFirstPacket() const noexcept;
 
     /**
      * @brief Checks if this is the last packet in the page.
-     * @return true if pagePosition == pageLength - 1.
+     *
+     * @return true if pagePosition == pageLen - 1, indicating this is the last packet of the page.
      */
     [[nodiscard]] bool isLastPacket() const noexcept;
 
     // =============== Utilities ===============
     /**
      * @brief Gets a string representation of the packet.
-     * @return String in format "Dest: RouterIP - ID: PageID-Position" (e.g., "Dest: 5 - ID: 000000123-4").
+     *
+     * @return String describing the packet, including pageID, pagePos, pageLen, srcIP, dstIP, and
+     * expTick.
      */
     [[nodiscard]] std::string toString() const;
 
     /**
      * @brief Stream output operator.
+     *
+     * @param os Output stream to write to.
+     * @param packet The packet to output.
+     * @return Reference to the output stream after writing the packet's string representation.
      */
     friend std::ostream& operator<<(std::ostream& os, const Packet& packet);
 
     // =============== Comparison Operators ===============
     /**
-     * @brief Equality comparison based on pageID and pagePosition.
+     * @brief Equality comparison operator.
+     *
      * @param other Packet to compare with.
-     * @return true if packets have the same pageID and pagePosition.
+     * @return true if both packets have the same pageID and pagePosition, false otherwise.
      */
     [[nodiscard]] bool operator==(const Packet& other) const noexcept;
 
     /**
-     * @brief Inequality comparison.
+     * @brief Inequality comparison operator.
+     *
      * @param other Packet to compare with.
-     * @return true if packets differ in pageID or pagePosition.
+     * @return true if the packets differ in pageID or pagePosition.
      */
     [[nodiscard]] bool operator!=(const Packet& other) const noexcept;
 };

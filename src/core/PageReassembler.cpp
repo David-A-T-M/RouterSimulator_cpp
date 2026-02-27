@@ -14,7 +14,11 @@ PageReassembler::PageReassembler(size_t id, size_t length, size_t expTick)
 }
 
 PageReassembler::PageReassembler(PageReassembler&& other) noexcept
-    : pageID(other.pageID), total(other.total), count(other.count), expTick(other.expTick), packets(other.packets) {
+    : pageID(other.pageID),
+      total(other.total),
+      count(other.count),
+      expTick(other.expTick),
+      packets(other.packets) {
     other.packets = nullptr;
 }
 
@@ -116,8 +120,8 @@ void PageReassembler::reset() {
 
 std::string PageReassembler::toString() const {
     std::ostringstream oss;
-    oss << "PageReassembler{ID: " << pageID << " | " << count << "/" << total << " packets received | ExpTick: }"
-        << expTick;
+    oss << "PageReassembler{ID: " << pageID << " | " << count << "/" << total
+        << " packets received | ExpTick: }" << expTick;
     return oss.str();
 }
 

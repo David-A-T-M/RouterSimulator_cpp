@@ -44,9 +44,10 @@ double PacketBuffer::getUtilization() const noexcept {
 }
 
 bool PacketBuffer::contains(size_t pageID, size_t pagePos) const {
-    return std::any_of(packets.begin(), packets.end(), [pageID, pagePos](const Packet& packet) noexcept {
-        return packet.getPageID() == pageID && packet.getPagePos() == pagePos;
-    });
+    return std::any_of(packets.begin(), packets.end(),
+                       [pageID, pagePos](const Packet& packet) noexcept {
+                           return packet.getPageID() == pageID && packet.getPagePos() == pagePos;
+                       });
 }
 
 // =============== Buffer Management ===============

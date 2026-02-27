@@ -324,8 +324,10 @@ TEST_F(TerminalTest, ComplexScenario_SendAndReceive) {
     EXPECT_EQ(trm.getPagesCreated(), 3);
     EXPECT_EQ(trm.getPacketsOutPending(), 15);
 
-    for (int i = 0; i < 3; ++i) trm.receivePacket(Packet(100, i, 3, src, dst, TICK));
-    for (int i = 0; i < 3; ++i) trm.receivePacket(Packet(200, i, 3, src, dst, TICK));
+    for (int i = 0; i < 3; ++i)
+        trm.receivePacket(Packet(100, i, 3, src, dst, TICK));
+    for (int i = 0; i < 3; ++i)
+        trm.receivePacket(Packet(200, i, 3, src, dst, TICK));
 
     trm.tick(1);
 

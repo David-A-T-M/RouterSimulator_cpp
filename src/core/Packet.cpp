@@ -1,7 +1,13 @@
-#include "../../include/core/Packet.h"
+#include "core/Packet.h"
 
-Packet::Packet(size_t pageID, size_t pagePos, size_t pageLen, IPAddress srcIP, IPAddress dstIP, size_t expTick)
-    : pageID(pageID), pagePos(pagePos), pageLen(pageLen), expTick(expTick), srcIP(srcIP), dstIP(dstIP) {
+Packet::Packet(size_t pageID, size_t pagePos, size_t pageLen, IPAddress srcIP, IPAddress dstIP,
+               size_t expTick)
+    : pageID(pageID),
+      pagePos(pagePos),
+      pageLen(pageLen),
+      expTick(expTick),
+      srcIP(srcIP),
+      dstIP(dstIP) {
 
     if (pagePos >= pageLen) {
         throw std::invalid_argument("pagePosition must be in the range [0, pageLength)");
@@ -16,11 +22,8 @@ Packet::Packet(size_t pageID, size_t pagePos, size_t pageLen, IPAddress srcIP, I
 
 std::string Packet::toString() const {
     std::ostringstream oss;
-
-    // Format:   Src: srcIP   -> Dst: dstIP   | ID: PageID(6 digits)-pagePos/pageLen
-    // Example: "Src: 001.001 -> Dst: 002.002 | ID: 000010          -2     /3"
-    oss << "Src: " << srcIP << " -> Dst: " << dstIP << " | ID: " << std::setw(6) << std::setfill('0') << pageID << "-"
-        << pagePos << "/" << pageLen;
+    oss << "Src: " << srcIP << " -> Dst: " << dstIP << " | ID: " << std::setw(6)
+        << std::setfill('0') << pageID << "-" << pagePos << "/" << pageLen;
 
     return oss.str();
 }

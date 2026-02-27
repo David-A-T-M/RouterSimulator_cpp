@@ -5,17 +5,18 @@
 
 /**
  * @class PacketBuffer
- * @brief A packet buffer supporting FIFO queueing.
+ * @brief Represents a buffer that holds packets in a queue-like structure for terminals and
+ * routers.
  *
- * This class wraps a List<Packet> and provides a simple queue interface (enqueue at back, dequeue from front)
- *
- * Used for:
- * - Terminal/Router input/output buffers (FIFO)
+ * The PacketBuffer class provides functionality to enqueue and dequeue packets, check buffer status
+ * (empty/full), and manage buffer capacity. It can be used for both terminal output buffers
+ * (packets waiting to be sent to the router) and router input/output buffers (packets waiting to be
+ * processed or forwarded).
  */
 class PacketBuffer {
-    List<Packet> packets; /**< Internal packet storage */
-    size_t capacity;      /**< Maximum capacity (0 = unlimited) */
-    IPAddress dstIP;      /**< Associated router IP (for output buffers) */
+    List<Packet> packets; /**< List of packets currently in the buffer, maintained in FIFO order */
+    size_t capacity;      /**< Maximum number of packets the buffer can hold (0 = unlimited) */
+    IPAddress dstIP;      /**< Associated destination IP for this buffer */
 
 public:
     // =============== Constructors & Destructor ===============
@@ -29,8 +30,7 @@ public:
     /**
      * @brief Constructor with associated router IP.
      *
-     * @param dstIP Associated router IP address.
-     *
+     * @param dstIP Associated destination IP for this buffer (0.0 indicates no association).
      * @param capacity Maximum buffer capacity (0 = unlimited, default).
      */
     explicit PacketBuffer(IPAddress dstIP, size_t capacity = 0);
@@ -52,12 +52,14 @@ public:
 
     /**
      * @brief Default Copy Assignment operator.
+     *
      * @return Reference to this PacketBuffer.
      */
     PacketBuffer& operator=(const PacketBuffer&) = default;
 
     /**
      * @brief Default Move Assignment operator.
+     *
      * @return Reference to this PacketBuffer.
      */
     PacketBuffer& operator=(PacketBuffer&&) noexcept = default;
@@ -66,15 +68,14 @@ public:
     /**
      * @brief Gets the associated destination IP.
      *
-     * @return Destination IP address.
-     *
-     * @note A 0.0 IP indicates no specific association.
+     * @return Destination IP address (0.0 if no association).
      */
     [[nodiscard]] IPAddress getDstIP() const noexcept;
 
     /**
      * @brief Gets the maximum capacity.
-     * @return Capacity (0 = unlimited).
+     *
+     * @return Maximum number of packets the buffer can hold (0 = unlimited).
      */
     [[nodiscard]] size_t getCapacity() const noexcept;
 
@@ -82,59 +83,67 @@ public:
     /**
      * @brief Adds a packet to the buffer.
      *
-     * @param packet The packet to add.
-     *
-     * @return true if a packet was added, false if the buffer is full.
+     * @param packet The packet to add to the buffer.
+     * @return true if the packet was added successfully, false if the buffer is full and the packet
+     * was dropped.
      */
     bool enqueue(const Packet& packet);
 
     /**
-     * @brief Removes and returns the front packet.
+     * @brief Removes and returns the front packet from the buffer.
      *
-     * In both modes, removes from the front of the queue.
-     *
-     * @return The front packet.
-     * @throws std::runtime_error if the buffer is empty.
+     * @return The packet at the front of the buffer.
+     * @throws std::runtime_error if the buffer is empty when attempting to dequeue.
      */
     Packet dequeue();
 
     // =============== Query methods ===============
     /**
      * @brief Checks if the buffer is empty.
-     * @return true if no packets in the buffer.
+     *
+     * @return true if there are no packets in the buffer, false otherwise.
      */
     [[nodiscard]] bool isEmpty() const noexcept;
 
     /**
-     * @brief Checks if the buffer is full.
-     * @return true if at capacity (always false if capacity = 0).
+     * @brief Checks if the buffer is at full capacity.
+     *
+     * @return true if the buffer has reached its maximum capacity (if capacity > 0), false
+     * otherwise (including unlimited capacity).
      */
     [[nodiscard]] bool isFull() const noexcept;
 
     /**
-     * @brief Gets the current number of packets.
-     * @return Number of packets in the buffer.
+     * @brief Gets the current number of packets in the buffer.
+     *
+     * @return Number of packets currently in the buffer.
      */
     [[nodiscard]] size_t size() const noexcept;
 
     // =============== Query methods ===============
     /**
-     * @brief Gets the number of available slots.
-     * @return Number of additional packets that can be added (or INT_MAX if unlimited).
+     * @brief Gets the number of additional packets that can be added to the buffer before reaching
+     * capacity.
+     *
+     * @return Number of additional packets that can be enqueued (0 if full, or
+     * std::numeric_limits<int>::max() if unlimited).
      */
     [[nodiscard]] size_t availableSpace() const noexcept;
 
     /**
-     * @brief Gets the buffer utilization rate.
-     * @return Value between 0.0 and 1.0 (0.0 if unlimited capacity).
+     * @brief Gets the current utilization of the buffer as a percentage of its capacity.
+     *
+     * @return Utilization as a value between 0.0 and 1.0 (0.0 if empty, or unlimited capacity).
      */
     [[nodiscard]] double getUtilization() const noexcept;
 
     /**
-     * @brief Checks if the buffer contains a packet with a specific pageID and position.
+     * @brief Checks if a packet with a specific page ID and page position exists in the buffer.
+     *
      * @param pageID Page ID to search for.
-     * @param pagePos Packet position to search for.
-     * @return true if found.
+     * @param pagePos Page position to search for.
+     * @return true if a packet with the specified page ID and position is found in the buffer,
+     * false otherwise.
      */
     [[nodiscard]] bool contains(size_t pageID, size_t pagePos) const;
 
@@ -145,34 +154,42 @@ public:
     void clear() noexcept;
 
     /**
-     * @brief Sets a new capacity.
+     * @brief Sets a new maximum capacity for the buffer.
+     *
      * @param newCapacity New maximum capacity (0 = unlimited).
-     * @throws std::invalid_argument if newCapacity < current size.
+     * @throws std::invalid_argument if newCapacity is less than the current number of packets in
+     * the buffer.
      */
     void setCapacity(size_t newCapacity);
 
     /**
-     * @brief Sets the associated destination IP.
-     * @param dstIP New destination IP address.
+     * @brief Sets a new associated destination IP for this buffer.
+     *
+     * @param newDst New destination IP address to associate with this buffer.
      */
-    void setDstIP(IPAddress dstIP) noexcept;
+    void setDstIP(IPAddress newDst) noexcept;
 
     /**
-     * @brief Removes a specific packet from the buffer.
-     * @param index Position to remove.
-     * @throws std::out_of_range if the index is invalid.
+     * @brief Removes a packet at a specific index from the buffer.
+     *
+     * @param index Index of the packet to remove (0-based).
+     * @throws std::out_of_range if index is greater than or equal to the current number of packets
+     * in the buffer.
      */
     void removeAt(size_t index);
 
     // =============== Utilities ===============
     /**
      * @brief Gets a string representation of the buffer.
-     * @return String describing buffer state.
+     *
+     * @return String describing the buffer's destination IP, capacity, current size, and packet
+     * details.
      */
     [[nodiscard]] std::string toString() const;
 
     /**
      * @brief Stream output operator.
+     *
      * @param os Output stream.
      * @param buffer Buffer to output.
      * @return Reference to the output stream.
@@ -194,8 +211,8 @@ inline bool PacketBuffer::isEmpty() const noexcept {
     return packets.isEmpty();
 }
 
-inline void PacketBuffer::setDstIP(IPAddress dstIP) noexcept {
-    PacketBuffer::dstIP = dstIP;
+inline void PacketBuffer::setDstIP(IPAddress newDst) noexcept {
+    dstIP = newDst;
 }
 
 inline bool PacketBuffer::isFull() const noexcept {

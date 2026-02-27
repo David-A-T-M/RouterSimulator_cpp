@@ -6,37 +6,45 @@
 
 /**
  * @class IPAddress
- * @brief Represents a simplified IP address with Router.Terminal format.
+ * @brief Represents a compact 2-byte IP address for routers and terminals in the network
+ * simulation.
  *
- * This class efficiently stores a 2-byte IP address where:
- * - The high byte represents the Router ID (0-255)
- * - The low byte represents the Terminal ID (0-255)
- * - If the Terminal ID is 0, it represents only a Router
+ * The IP address is structured as follows:
+ * - The upper 8 bits (bits 15-8) represent the Router ID, which identifies the network/router.
+ * - The lower 8 bits (bits 7-0) represent the Terminal ID, which identifies a specific terminal
+ * connected to that router.
  */
 class IPAddress {
-    uint16_t address{};
+    uint16_t address{}; /**< Internal 16-bit representation of the IP address, combining router and
+                           terminal IDs. */
 
 public:
     // =============== Constructors & Destructor ===============
     /**
-     * @brief Default constructor, initializes the IP address to 0.0.
+     * @brief Default constructor initializes the IP address to 0.0 (invalid).
      */
     constexpr IPAddress() noexcept = default;
 
     /**
-     * @brief Constructs a 16-bit IP address from 8-bit components.
+     * @brief Constructor that takes separate router and terminal IDs to create a compact IP
+     * address.
      *
-     * Uses bitwise shifting to pack the router and terminal IDs into a single
-     * 16-bit integer for memory efficiency and fast comparisons.
+     * The routerIP is stored in the upper 8 bits and the terminalIP in the lower 8 bits of the
+     * 16-bit address.
      *
-     * @param routerIP The 8-bit identifier for the network/router.
-     * @param terminalIP The 8-bit identifier for the specific terminal (default is 0 for routers).
+     * @param routerIP The 8-bit identifier for the router (must be > 0 for valid routers).
+     * @param terminalIP The 8-bit identifier for the terminal (0 for routers, > 0 for terminals).
+     * Default is 0, which indicates a router.
      */
     constexpr explicit IPAddress(uint8_t routerIP, uint8_t terminalIP = 0) noexcept;
 
     /**
-     * @brief Constructs an IPAddress directly from a raw 16-bit value.
-     * @param rawAddress The pre-packed 16-bit representation.
+     * @brief Constructor that takes a raw 16-bit integer to create an IP address. This allows for
+     * direct initialization from a pre-packed address, but requires the caller to ensure the
+     * correct format (router in upper 8 bits, terminal in lower 8 bits).
+     *
+     * @param rawAddress A 16-bit integer where the upper 8 bits represent the router ID and the
+     * lower 8 bits represent the terminal ID.
      */
     constexpr explicit IPAddress(uint16_t rawAddress) noexcept;
 
@@ -57,12 +65,14 @@ public:
 
     /**
      * @brief Default copy assignment operator.
-     * @return Reference to this IPAddress after assignment.
+     *
+     * @return Reference to this IPAddress after copy assignment.
      */
     IPAddress& operator=(const IPAddress&) = default;
 
     /**
      * @brief Default move assignment operator.
+     *
      * @return Reference to this IPAddress after move assignment.
      */
     IPAddress& operator=(IPAddress&&) noexcept = default;
@@ -70,76 +80,83 @@ public:
     // =============== Getters ===============
     /**
      * @brief Extracts the 8-bit Router ID from the 16-bit address.
-     * @return The upper 8 bits of the address.
+     *
+     * @return The upper 8 bits of the address representing the Router ID.
      */
     [[nodiscard]] constexpr uint8_t getRouterIP() const noexcept;
 
     /**
      * @brief Extracts the 8-bit Terminal ID from the 16-bit address.
-     * @return The lower 8 bits of the address.
+     *
+     * @return The lower 8 bits of the address representing the Terminal ID.
      */
     [[nodiscard]] constexpr uint8_t getTerminalIP() const noexcept;
 
     /**
-     * @brief Returns the raw 16-bit integer representation of the IP.
-     * @return uint16_t containing both Router and Terminal segments.
+     * @brief Returns the raw 16-bit integer representation of the IP address, combining both the
+     * Router ID and Terminal ID.
+     *
+     * @return The 16-bit integer where the upper 8 bits are the Router ID and the lower 8 bits are
+     * the Terminal ID.
      */
     [[nodiscard]] constexpr uint16_t getRawAddress() const noexcept;
 
     // =============== Query Methods ===============
     /**
-     * @brief Checks if the address represents a Router node.
+     * @brief Determines if this IP address represents a Router or a Terminal based on the Terminal
+     * ID.
      *
-     * In this simulation, a Router is defined by having a
-     * Terminal ID equal to zero.
-     *
-     * @return true if it is a Router, false if it is a Terminal.
+     * @return true if the Terminal ID is 0 (indicating a Router), false if the Terminal ID is
+     * greater than 0 (indicating a Terminal).
      */
     [[nodiscard]] constexpr bool isRouter() const noexcept;
 
     /**
-     * @brief Validates if the IP address is not null (0.0).
-     * @return true if the address is non-zero, false otherwise.
+     * @brief Checks if the IP address is valid.
+     *
+     * @return true if the address is valid (not 0.0), false if it is invalid (0.0).
      */
     [[nodiscard]] constexpr bool isValid() const noexcept;
 
     // =============== Utilities ===============
     /**
-     * @brief Returns a human-readable string representation of the IP.
+     * @brief Converts the IP address to a human-readable string format "RRR.TTT", where RRR is the
+     * Router ID and TTT is the Terminal ID, both zero-padded to 3 digits.
      *
-     * Formatting:
-     * - Routers: "Router(X)"
-     * - Terminals: "X.Y"
-     *
-     * @return std::string formatted address.
+     * @return A string describing the IP address in a human-readable format.
      */
     [[nodiscard]] std::string toString() const;
 
     /**
      * @brief Overloads the stream insertion operator for IPAddress.
+     *
      * @param os The output stream.
      * @param ip The IPAddress object to print.
-     * @return std::ostream& The modified output stream.
+     * @return Reference to the output stream after inserting the IP address string representation.
      */
     friend std::ostream& operator<<(std::ostream& os, const IPAddress& ip);
 
     // =============== Comparison Operators ===============
     /**
      * @brief Equality operator to compare two IPAddress objects.
+     *
      * @param other The other IPAddress to compare with.
-     * @return true if both addresses are equal, false otherwise.
+     * @return true if both IP addresses are the same (same router and terminal IDs), false
+     * otherwise.
      */
     [[nodiscard]] constexpr bool operator==(const IPAddress& other) const noexcept;
 
     /**
      * @brief Inequality operator to compare two IPAddress objects.
+     *
      * @param other The other IPAddress to compare with.
-     * @return true if the addresses are not equal, false otherwise.
+     * @return true if the IP addresses are different, false if they are the same.
      */
     [[nodiscard]] constexpr bool operator!=(const IPAddress& other) const noexcept;
 
     /**
      * @brief Less-than operator for ordering IPAddress objects.
+     *
      * @param other The other IPAddress to compare with.
      * @return true if this address is less than the other, false otherwise.
      */
@@ -147,6 +164,7 @@ public:
 
     /**
      * @brief Less-than-or-equal operator for ordering IPAddress objects.
+     *
      * @param other The other IPAddress to compare with.
      * @return true if this address is less than or equal to the other, false otherwise.
      */
@@ -154,6 +172,7 @@ public:
 
     /**
      * @brief Greater-than operator for ordering IPAddress objects.
+     *
      * @param other The other IPAddress to compare with.
      * @return true if this address is greater than the other, false otherwise.
      */
@@ -161,6 +180,7 @@ public:
 
     /**
      * @brief Greater-than-or-equal operator for ordering IPAddress objects.
+     *
      * @param other The other IPAddress to compare with.
      * @return true if this address is greater than or equal to the other, false otherwise.
      */
@@ -201,7 +221,8 @@ inline std::string IPAddress::toString() const {
     const uint8_t t = getTerminalIP();
 
     std::ostringstream oss;
-    oss << std::setfill('0') << std::setw(3) << +r << "." << std::setfill('0') << std::setw(3) << +t;
+    oss << std::setfill('0') << std::setw(3) << +r << "." << std::setfill('0') << std::setw(3)
+        << +t;
 
     return oss.str();
 }

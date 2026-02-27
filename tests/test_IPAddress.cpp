@@ -271,8 +271,8 @@ TEST(IPAddressComplex, NetworkScenario) {
 }
 
 TEST(IPAddressComplex, SortingAddresses) {
-    std::vector addresses = {IPAddress(5, 100), IPAddress(3, 50), IPAddress(5, 10), IPAddress(3, 200),
-                             IPAddress(10, 0)};
+    std::vector addresses = {IPAddress(5, 100), IPAddress(3, 50), IPAddress(5, 10),
+                             IPAddress(3, 200), IPAddress(10, 0)};
 
     std::sort(addresses.begin(), addresses.end());
 

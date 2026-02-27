@@ -13,8 +13,8 @@ class Router;
 
 /**
  * @class Router
- * @brief Represents a network router that manages connections,
- * packet routing, and bandwidth allocation for a network simulation.
+ * @brief Represents a network router that manages connections to terminals and neighbor routers,
+ * processes packets, and maintains routing information.
  */
 class Router {
 public:
@@ -33,15 +33,18 @@ public:
      * as the bandwidth and processing constraints.
      */
     struct Config {
-        size_t inBufferCap; /**< Input buffer capacity for the router */
-        size_t inProcCap;   /**< Input processing rate, packets that can be processed from the input
-                               buffer per cycle */
-        size_t locBufferCap; /**< Local buffer capacity for packets destined to local terminals */
-        size_t locBW;        /**< Local bandwidth, number of packets that can be sent to each local
-                                terminal per cycle */
-        size_t outBufferCap; /**< Output buffer capacity for the router */
-        size_t outBW; /**< Output bandwidth, number of packets that can be sent to the router per
-                         cycle */
+        /** Input buffer capacity for the router */
+        size_t inBufferCap;
+        /** Input processing rate, packets that can be processed from the input buffer per cycle */
+        size_t inProcCap;
+        /** Local buffer capacity for packets destined to local terminals */
+        size_t locBufferCap;
+        /** Local bandwidth, number of packets that can be sent to each local terminal per cycle */
+        size_t locBW;
+        /** Output buffer capacity for the router */
+        size_t outBufferCap;
+        /** Output bandwidth, number of packets that can be sent to the router per cycle */
+        size_t outBW;
 
         /**
          * @brief Default constructor for Config, initializes with default values.
@@ -54,6 +57,16 @@ public:
               outBufferCap(DEF_OUT_BUF_CAP),
               outBW(DEF_OUTPUT_BW) {}
 
+        /**
+         * @brief Parameterized constructor for Config allows setting custom values.
+         *
+         * @param inBufferCap Capacity of the input buffer.
+         * @param inProcCap Input processing rate (packets per cycle).
+         * @param locBufferCap Capacity of the local buffer for packets destined to local terminals.
+         * @param locBW Local bandwidth (packets per cycle to each local terminal).
+         * @param outBufferCap Capacity of the output buffer for the router.
+         * @param outBW Output bandwidth (packets per cycle to neighbor routers).
+         */
         Config(size_t inBufferCap, size_t inProcCap, size_t locBufferCap, size_t locBW,
                size_t outBufferCap, size_t outBW)
             : inBufferCap(inBufferCap),
@@ -75,6 +88,7 @@ private:
 
         /**
          * @brief Constructor for RouterConnection.
+         *
          * @param r Pointer to the neighbor router (must not be nullptr).
          * @param capacity Capacity of the output buffer for this connection (default 0).
          */
@@ -82,25 +96,23 @@ private:
             : neighborRouter(r), outBuffer(PacketBuffer{r->getIP(), capacity}) {}
 
         /**
-         * @brief Move constructor - defaulted to allow moving of RtrConnection objects without
-         * copying.
+         * @brief Move constructor - defaulted to allow moving of RtrConnection objects
          */
         RtrConnection(RtrConnection&&) noexcept = default;
 
         /**
-         * @brief Move assignment operator - defaulted to allow moving of RtrConnection objects
-         * without copying.
+         * @brief Move assignment operator - defaulted to allow moving of RtrConnection objects.
+         *
          * @return Reference to this object after the move assignment.
          */
         RtrConnection& operator=(RtrConnection&&) noexcept = default;
     };
 
-    /**< Unique pointer type for managing connected terminals */
+    /** Unique pointer type for managing connected terminals */
     using TerminalPtr  = std::unique_ptr<Terminal>;
-    /**< Unordered map of connected terminals, keyed by their IP address for efficient lookup */
+    /** Unordered map of connected terminals, keyed by their IP address for efficient lookup */
     using TerminalList = std::unordered_map<IPAddress, TerminalPtr>;
-    /**< List of connections to neighbor routers, each containing a pointer to the neighbor and its
-     * output buffer */
+    /** Unordered map of connections to neighbor routers, keyed by the neighbor's IP address */
     using RoutersList  = std::unordered_map<IPAddress, RtrConnection>;
 
     IPAddress routerIP;        /**< Router's IP address */
@@ -124,6 +136,7 @@ private:
 public:
     /**
      * @brief Constructor for Router.
+     *
      * @param ip Router's IP address (must have terminalID = 0).
      * @param terminals Number of terminals to initialize (default 0).
      * @param cfg Configuration struct for bandwidth and buffer settings (optional).
@@ -147,6 +160,7 @@ public:
 
     /**
      * @brief Copy assignment operator - deleted to prevent copying.
+     *
      * @return Reference to this object.
      */
     Router& operator=(const Router&) = delete;
@@ -158,6 +172,7 @@ public:
 
     /**
      * @brief Move assignment operator - deleted to prevent moving.
+     *
      * @return Reference to this object.
      */
     Router& operator=(Router&&) = delete;
@@ -165,6 +180,7 @@ public:
     // =============== Connection Management ===============
     /**
      * @brief Connects a terminal to this router.
+     *
      * @param terminal Unique pointer to the terminal to connect (must not be nullptr).
      * @return true if connected successfully, false otherwise.
      * @throws std::invalid_argument if the terminal is nullptr or wrong router.
@@ -173,9 +189,9 @@ public:
 
     /**
      * @brief Connects a neighbor router to this router.
+     *
      * @param neighbor Pointer to the neighbor router to connect (must not be nullptr).
-     * @return true if connected successfully, false if the neighbor is nullptr or already
-     * connected.
+     * @return true if connected successfully, false if already connected or nullptr.
      * @throws std::invalid_argument if the neighbor router is nullptr.
      */
     bool connectRouter(Router* neighbor);
@@ -183,6 +199,7 @@ public:
     // =============== Transmission ===============
     /**
      * @brief Receives a packet from the network and enqueues it in the input buffer.
+     *
      * @param packet The packet to receive.
      * @return true if the packet was buffered successfully, false if dropped due to input buffer
      * overflow.
@@ -193,6 +210,7 @@ public:
     /**
      * @brief Processes packets in output buffers for neighbor routers, sending them out and
      * updating statistics.
+     *
      * @param currentTick The current system tick for processing timeouts and expirations.
      * @return Total number of packets sent to neighbor routers.
      */
@@ -201,6 +219,7 @@ public:
     /**
      * @brief Processes packets in the local buffer, delivering them to connected terminals and
      * updating statistics.
+     *
      * @param currentTick The current system tick for processing timeouts and expirations.
      * @return Total number of packets delivered to local terminals.
      */
@@ -209,6 +228,7 @@ public:
     /**
      * @brief Advances the state of connected terminals by one tick, allowing them to process their
      * input and output buffers and update their internal state.
+     *
      * @param currentTick The current system tick for processing timeouts and expirations.
      */
     void tickTerminals(size_t currentTick);
@@ -216,6 +236,7 @@ public:
     /**
      * @brief Processes packets in the input buffer, routing them to the appropriate output buffers
      * or local buffer based on the routing table, and updating statistics.
+     *
      * @param currentTick The current system tick for processing timeouts and expirations.
      * @return Total number of packets processed from the input buffer.
      */
@@ -224,6 +245,7 @@ public:
     /**
      * @brief Advances the state of the router by one tick, processing output buffers, local buffer,
      * terminals, and input buffer in the correct order to simulate a full cycle of operation.
+     *
      * @param currentTick The current system tick for processing timeouts and expirations.
      */
     void tick(size_t currentTick);
@@ -231,24 +253,28 @@ public:
     // =============== Configuration ===============
     /**
      * @brief Sets the input processing capacity of the router.
+     *
      * @param proCap New processing capacity (packets per cycle).
      */
     void setInProcCap(size_t proCap) noexcept;
 
     /**
      * @brief Sets the local buffer bandwidth of the router.
+     *
      * @param bw New local buffer bandwidth (packets per cycle).
      */
     void setLocBufferBW(size_t bw) noexcept;
 
     /**
      * @brief Sets the output buffer bandwidth of the router.
+     *
      * @param bw New output buffer bandwidth (packets per cycle).
      */
     void setOutBufferBW(size_t bw) noexcept;
 
     /**
      * @brief Sets the routing table for the router.
+     *
      * @param table New routing table to use for packet forwarding.
      */
     void setRoutingTable(RoutingTable&& table) noexcept;
@@ -257,42 +283,49 @@ public:
 
     /**
      * @brief Gets the IP address of the router.
+     *
      * @return Router's IP address.
      */
     [[nodiscard]] IPAddress getIP() const noexcept;
 
     /**
      * @brief Gets the number of terminals currently connected to this router.
+     *
      * @return Number of connected terminals.
      */
     [[nodiscard]] size_t getTerminalCount() const noexcept;
 
     /**
      * @brief Gets the number of neighbor routers currently connected to this router.
+     *
      * @return Number of connected neighbor routers.
      */
     [[nodiscard]] size_t getRouterCount() const noexcept;
 
     /**
      * @brief Gets the input processing capacity of the router.
+     *
      * @return Input processing capacity (packets per cycle).
      */
     [[nodiscard]] size_t getInProcCap() const noexcept;
 
     /**
      * @brief Gets the local buffer bandwidth of the router.
+     *
      * @return Local buffer bandwidth (packets per cycle).
      */
     [[nodiscard]] size_t getLocBufferBW() const noexcept;
 
     /**
      * @brief Gets the output buffer bandwidth of the router.
+     *
      * @return Output buffer bandwidth (packets per cycle).
      */
     [[nodiscard]] size_t getOutBufferBW() const noexcept;
 
     /**
      * @brief Gets the total number of packets that have been received by the router.
+     *
      * @return Total packets received.
      */
     [[nodiscard]] size_t getPacketsReceived() const noexcept;
@@ -300,40 +333,66 @@ public:
     /**
      * @brief Gets the total number of packets that have been dropped due to buffer overflow or no
      * route.
+     *
      * @return Total packets dropped.
      */
     [[nodiscard]] size_t getPacketsDropped() const noexcept;
 
     /**
      * @brief Gets the total number of packets that have timed out while in the router's buffers.
+     *
      * @return Total packets that have expired and been dropped due to timeout.
      */
     [[nodiscard]] size_t getPacketsTimedOut() const noexcept;
 
     /**
      * @brief Gets the total number of packets forwarded to neighbor routers.
+     *
      * @return Total packets forwarded to neighbor routers.
      */
     [[nodiscard]] size_t getPacketsForwarded() const noexcept;
 
     /**
      * @brief Gets the total number of packets delivered to local terminals.
+     *
      * @return Total packets delivered to local terminals.
      */
     [[nodiscard]] size_t getPacketsDelivered() const noexcept;
+
+    /**
+     * @brief Gets the number of packets currently pending in the input buffer.
+     *
+     * @return Number of packets currently in the input buffer.
+     */
     [[nodiscard]] size_t getPacketsInPending() const noexcept;
+
+    /**
+     * @brief Gets the total number of packets currently pending in all output buffers for neighbor
+     * routers.
+     *
+     * @return Total number of packets currently in output buffers for neighbor routers.
+     */
     [[nodiscard]] size_t getPacketsOutPending() const noexcept;
+
+    /**
+     * @brief Gets the number of packets currently pending in the local buffer for delivery to local
+     * terminals.
+     *
+     * @return Number of packets currently in the local buffer.
+     */
     [[nodiscard]] size_t getPacketsLocPending() const noexcept;
 
     /**
      * @brief Gets the current usage of the local buffer (number of packets currently in the local
      * buffer).
+     *
      * @return Number of packets currently in the local buffer.
      */
     [[nodiscard]] size_t getLocalBufferUsage() const noexcept;
 
     /**
      * @brief Gets the size of the output buffer for a specific neighbor router.
+     *
      * @param neighborIP IP address of the neighbor router.
      * @return Size of the output buffer, or 0 if neighbor not found.
      */
@@ -341,6 +400,7 @@ public:
 
     /**
      * @brief Gets a pointer to a connected terminal by its IP address.
+     *
      * @param ip IP address of the terminal to retrieve.
      * @return Pointer to the Terminal if found, or nullptr if no terminal with the given IP is
      * connected.
@@ -349,6 +409,7 @@ public:
 
     /**
      * @brief Gets the IP addresses of all connected neighbor routers.
+     *
      * @return List of neighbor router IP addresses.
      */
     [[nodiscard]] List<IPAddress> getNeighborIPs() const;
@@ -356,6 +417,7 @@ public:
     // =============== Utilities ===============
     /**
      * @brief Gets string representation.
+     *
      * @return A string representation of the router, including its IP address and number of
      * connected terminals and routers.
      */
@@ -363,6 +425,10 @@ public:
 
     /**
      * @brief Stream output operator.
+     *
+     * @param os Output stream to write to.
+     * @param router Router to output.
+     * @return Reference to the output stream after writing the router's string representation.
      */
     friend std::ostream& operator<<(std::ostream& os, const Router& router);
 
@@ -371,12 +437,14 @@ private:
     /**
      * @brief Initializes a specified number of terminals with sequential terminal IDs. The
      * terminals are added to the list of terminals.
+     *
      * @param count Number of terminals to initialize.
      */
     void initializeTerminals(size_t count);
 
     /**
      * @brief Gets a pointer to the output buffer for a specific neighbor router.
+     *
      * @param nextIP IP address of the neighbor router.
      * @return Pointer to the output buffer, or nullptr if neighbor not found.
      */
@@ -384,12 +452,14 @@ private:
 
     /**
      * @brief Routes a single packet to appropriate destination.
+     *
      * @return true if routed successfully, false if dropped.
      */
     bool routePacket(const Packet& packet);
 
     /**
      * @brief Checks if a router with a given IP is already connected.
+     *
      * @param neighborIP IP address of the neighbor router.
      * @return true if connected, false otherwise.
      */
@@ -397,6 +467,7 @@ private:
 
     /**
      * @brief Checks if a terminal with a given IP is already connected.
+     *
      * @param terminalIP IP address of the terminal.
      * @return true if connected, false otherwise.
      */

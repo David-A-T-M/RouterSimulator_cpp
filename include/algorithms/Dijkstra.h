@@ -45,7 +45,8 @@ public:
      * @param routers List of all routers.
      * @param tables Output list of routing tables (cleared first).
      */
-    static void computeAllRoutingTables(const List<const Router*>& routers, List<RoutingTable>& tables);
+    static void computeAllRoutingTables(const List<const Router*>& routers,
+                                        List<RoutingTable>& tables);
 
 private:
     /**
