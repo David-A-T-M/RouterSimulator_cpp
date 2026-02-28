@@ -77,7 +77,7 @@ size_t Router::processOutputBuffers(size_t currentTick) {
         while (sent < outBufferBW && !buff.isEmpty()) {
             Packet packet = buff.dequeue();
 
-            if (packet.getExpTick() <= currentTick) {
+            if (packet.getTimeout() <= currentTick) {
                 packetsTimedOut++;
                 continue;
             }
@@ -103,7 +103,7 @@ size_t Router::processLocalBuffer(size_t currentTick) {
     while (delivered < locBufferBW && !locBuffer.isEmpty()) {
         Packet packet = locBuffer.dequeue();
 
-        if (packet.getExpTick() <= currentTick) {
+        if (packet.getTimeout() <= currentTick) {
             packetsTimedOut++;
             continue;
         }
@@ -136,7 +136,7 @@ size_t Router::processInputBuffer(size_t currentTick) {
         processed++;
         Packet packet = inBuffer.dequeue();
 
-        if (packet.getExpTick() <= currentTick) {
+        if (packet.getTimeout() <= currentTick) {
             packetsTimedOut++;
             continue;
         }
@@ -176,12 +176,52 @@ const Terminal* Router::getTerminal(IPAddress ip) const noexcept {
     return nullptr;
 }
 
+List<const Terminal*> Router::getTerminals() const noexcept {
+    List<const Terminal*> list;
+    for (const auto& terminal : terminals | std::views::values) {
+        list.pushBack(terminal.get());
+    }
+    return list;
+}
+
 List<IPAddress> Router::getNeighborIPs() const {
     List<IPAddress> ips;
     for (const auto& ip : connections | std::views::keys) {
         ips.pushBack(ip);
     }
     return ips;
+}
+
+List<IPAddress> Router::getTerminalIPs() const {
+    List<IPAddress> ips;
+    for (const auto& ip : terminals | std::views::keys) {
+        ips.pushBack(ip);
+    }
+    return ips;
+}
+
+void Router::shareAddressBook(List<IPAddress>* terminalIPs) {
+    for (const auto& ip : terminals | std::views::values) {
+        ip->setAddressBook(terminalIPs);
+    }
+}
+
+void Router::shareRandomGenerator(std::mt19937* r_gen) {
+    for (const auto& ip : terminals | std::views::values) {
+        ip->setRandomGenerator(r_gen);
+    }
+}
+
+void Router::shareTrafficProbability(float probability) {
+    for (const auto& ip : terminals | std::views::values) {
+        ip->setTrafficProbability(probability);
+    }
+}
+
+void Router::shareMaxPageLength(size_t pageLen) {
+    for (const auto& ip : terminals | std::views::values) {
+        ip->setMaxPageLength(pageLen);
+    }
 }
 
 std::string Router::toString() const {

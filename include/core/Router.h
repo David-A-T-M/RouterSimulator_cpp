@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <random>
 #include <unordered_map>
 
 #include "IPAddress.h"
@@ -408,11 +409,60 @@ public:
     [[nodiscard]] const Terminal* getTerminal(IPAddress ip) const noexcept;
 
     /**
+     * @brief Gets a list of pointers to all connected terminals.
+     *
+     * @return List of pointers to connected terminals.
+     */
+    [[nodiscard]] List<const Terminal*> getTerminals() const noexcept;
+
+    /**
      * @brief Gets the IP addresses of all connected neighbor routers.
      *
      * @return List of neighbor router IP addresses.
      */
     [[nodiscard]] List<IPAddress> getNeighborIPs() const;
+
+    /**
+     * @brief Gets the IP addresses of all connected terminals.
+     *
+     * @return List of terminal IP addresses.
+     */
+    [[nodiscard]] List<IPAddress> getTerminalIPs() const;
+
+    /**
+     * @brief Shares the network's address book with all connected terminals by setting their
+     * address book pointer to the provided list of terminal IP addresses.
+     *
+     * @param terminalIPs Pointer to the list of terminal IP addresses to share with connected
+     * terminals.
+     */
+    void shareAddressBook(List<IPAddress>* terminalIPs);
+
+    /**
+     * @brief Shares the random number generator with all connected terminals by setting their
+     * random generator pointer to the provided std::mt19937 pointer.
+     *
+     * @param r_gen Pointer to the std::mt19937 random number generator to share with connected
+     * terminals.
+     */
+    void shareRandomGenerator(std::mt19937* r_gen);
+
+    /**
+     * @brief Shares the traffic generation probability with all connected terminals by setting
+     * their traffic probability to the provided value.
+     *
+     * @param probability New traffic generation probability (0.0 to 1.0) to share with connected
+     * terminals.
+     */
+    void shareTrafficProbability(float probability);
+
+    /**
+     * @brief Shares the maximum page length for traffic generation with all connected terminals by
+     * setting their max page length to the provided value.
+     *
+     * @param pageLen New maximum page length (number of packets) to share with connected terminals.
+     */
+    void shareMaxPageLength(size_t pageLen);
 
     // =============== Utilities ===============
     /**
