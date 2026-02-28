@@ -145,11 +145,6 @@ public:
     explicit Router(IPAddress ip, size_t terminals = 0, const Config& cfg = Config{});
 
     /**
-     * @brief Default constructor - deleted
-     */
-    Router() = delete;
-
-    /**
      * @brief Destructor for Router.
      */
     ~Router();
