@@ -1,5 +1,7 @@
 #include "core/Network.h"
 
+#include "core/Terminal.h"
+
 Network::Network(const Config& config) : currentTick(1) {
     generateRandomNetwork(config.routerCount, config.maxTerminalCount, config.complexity,
                           config.trafficProbability, config.maxPageLen);
@@ -60,6 +62,36 @@ void Network::simulate(size_t ticks) {
         }
     }
     recalculateAllRoutes();
+}
+
+NetworkStats Network::getStats() const {
+    NetworkStats stats;
+    stats.currentTick = currentTick - 1;
+    for (auto& rtr : routers) {
+        stats.totalRouters++;
+        stats.totalTerminals += rtr->getTerminalCount();
+        stats.packetsDropped += rtr->getPacketsDropped();
+        stats.packetsTimedOut += rtr->getPacketsTimedOut();
+        stats.packetsInFlight += rtr->getPacketsInPending();
+        stats.packetsInFlight += rtr->getPacketsOutPending();
+        stats.packetsInFlight += rtr->getPacketsLocPending();
+        for (auto& terminal : rtr->getTerminals()) {
+            stats.pagesCreated += terminal->getPagesCreated();
+            stats.pagesDropped += terminal->getPagesDropped();
+            stats.pagesCompleted += terminal->getPagesCompleted();
+            stats.pagesTimedOut += terminal->getPagesTimedOut();
+            stats.packetsGenerated += terminal->getPacketsGenerated();
+            stats.packetsSent += terminal->getPacketsSent();
+            stats.packetsDropped += terminal->getPacketsInDropped();
+            stats.packetsDropped += terminal->getPacketsOutDropped();
+            stats.packetsTimedOut += terminal->getPacketsOutTimedOut();
+            stats.packetsTimedOut += terminal->getPacketsInTimedOut();
+            stats.packetsInFlight += terminal->getPacketsInPending();
+            stats.packetsInFlight += terminal->getPacketsOutPending();
+            stats.packetsDelivered += terminal->getPacketsSuccProcessed();
+        }
+    }
+    return stats;
 }
 
 void Network::addRouter(uint8_t rtrID, uint8_t TerminalCount, float probability, size_t PageLen) {
