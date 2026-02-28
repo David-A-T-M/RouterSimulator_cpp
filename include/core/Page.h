@@ -110,12 +110,12 @@ public:
      * tick. Each packet will have the same pageID, pageLen, srcIP, and dstIP as the page, and will
      * have a page position corresponding to its order in the list (starting from 0).
      *
-     * @param expTick The is the system tick at which the packets should be considered expired and
+     * @param timeout The is the system tick at which the packets should be considered expired and
      * dropped if not delivered.
      * @return List of packets that represent this page, ready for transmission. The list will
      * contain pageLen packets, each with the correct page position and expiration tick.
      */
-    [[nodiscard]] List<Packet> toPackets(size_t expTick) const;
+    [[nodiscard]] List<Packet> toPackets(size_t timeout) const;
 
     // =============== Utilities ===============
     /**

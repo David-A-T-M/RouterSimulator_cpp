@@ -7,7 +7,7 @@ protected:
     const IPAddress src{20, 15};
     const IPAddress dst{10, 5};
     static constexpr size_t TICK = 100;
-    PageReassembler reassembler{100, 10, TICK};
+    PageReassembler reassembler{100, src, 10, TICK};
 };
 
 // ===============  Constructor tests ===============
@@ -33,7 +33,7 @@ TEST_F(TestPageReassembler, Constructor_Move) {
 }
 
 TEST_F(TestPageReassembler, Assignment_Move) {
-    PageReassembler otherPR(2, 10, TICK);
+    PageReassembler otherPR(2, src, 10, TICK);
 
     reassembler = std::move(otherPR);
 
@@ -114,7 +114,7 @@ TEST_F(TestPageReassembler, HasPacket_InvalidPos) {
 
 // =============== Modifiers tests ===============
 TEST_F(TestPageReassembler, AddPacket_Ordered) {
-    PageReassembler otherPR(100, 3, TICK);
+    PageReassembler otherPR(100, src, 3, TICK);
     const Packet p0(100, 0, 3, src, dst, TICK);
     const Packet p1(100, 1, 3, src, dst, TICK);
     const Packet p2(100, 2, 3, src, dst, TICK);
@@ -199,7 +199,7 @@ TEST_F(TestPageReassembler, Package_Incomplete) {
 }
 
 TEST_F(TestPageReassembler, Package_SinglePacket) {
-    PageReassembler otherPR(100, 1, TICK);
+    PageReassembler otherPR(100, src, 1, TICK);
     otherPR.addPacket(Packet(100, 0, 1, src, dst, TICK));
 
     EXPECT_TRUE(otherPR.isComplete());
@@ -293,8 +293,8 @@ TEST_F(TestPageReassembler, SimulateRetransmission) {
 }
 
 TEST_F(TestPageReassembler, MultiplePages) {
-    PageReassembler reassembler2(200, 3, TICK);
-    PageReassembler reassembler3(300, 7, TICK);
+    PageReassembler reassembler2(200, src, 3, TICK);
+    PageReassembler reassembler3(300, src, 7, TICK);
 
     reassembler.addPacket(Packet(100, 0, 10, src, dst, TICK));
     reassembler2.addPacket(Packet(200, 0, 3, src, dst, TICK));

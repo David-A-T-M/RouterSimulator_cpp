@@ -1,8 +1,8 @@
 #include "core/PageReassembler.h"
 
 // =============== Constructors & Destructor ===============
-PageReassembler::PageReassembler(size_t id, size_t length, size_t expTick)
-    : pageID(id), total(length), count(0), expTick(expTick), packets(nullptr) {
+PageReassembler::PageReassembler(size_t id, IPAddress ip, size_t length, size_t timeout)
+    : pageID(id), srcIP(ip), total(length), count(0), timeout(timeout), packets(nullptr) {
     if (length == 0) {
         throw std::invalid_argument("expectedPackets must be positive");
     }
@@ -15,9 +15,10 @@ PageReassembler::PageReassembler(size_t id, size_t length, size_t expTick)
 
 PageReassembler::PageReassembler(PageReassembler&& other) noexcept
     : pageID(other.pageID),
+      srcIP(other.srcIP),
       total(other.total),
       count(other.count),
-      expTick(other.expTick),
+      timeout(other.timeout),
       packets(other.packets) {
     other.packets = nullptr;
 }
@@ -32,9 +33,10 @@ PageReassembler& PageReassembler::operator=(PageReassembler&& other) noexcept {
         }
 
         pageID  = other.pageID;
+        srcIP   = other.srcIP;
         total   = other.total;
         count   = other.count;
-        expTick = other.expTick;
+        timeout = other.timeout;
         packets = other.packets;
 
         other.packets = nullptr;
@@ -63,6 +65,10 @@ bool PageReassembler::hasPacketAt(size_t position) const {
 // =============== Modifiers ===============
 bool PageReassembler::addPacket(const Packet& p) {
     if (p.getPageID() != pageID) {
+        return false;
+    }
+
+    if (p.getSrcIP() != srcIP) {
         return false;
     }
 
@@ -120,8 +126,8 @@ void PageReassembler::reset() {
 
 std::string PageReassembler::toString() const {
     std::ostringstream oss;
-    oss << "PageReassembler{ID: " << pageID << " | " << count << "/" << total
-        << " packets received | ExpTick: }" << expTick;
+    oss << "PageReassembler{ID: " << pageID << " | srcIP: " << srcIP << " | " << count << "/"
+        << total << " packets received | Timeout: }" << timeout;
     return oss.str();
 }
 

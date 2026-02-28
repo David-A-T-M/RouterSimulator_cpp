@@ -60,11 +60,11 @@ Page::Page(List<Packet>&& packets) {
     }
 }
 
-List<Packet> Page::toPackets(size_t expTick) const {
+List<Packet> Page::toPackets(size_t timeout) const {
     List<Packet> packets;
 
     for (int pos = 0; pos < pageLen; ++pos) {
-        packets.pushBack(Packet(pageID, pos, pageLen, srcIP, dstIP, expTick));
+        packets.pushBack(Packet(pageID, pos, pageLen, srcIP, dstIP, timeout));
     }
 
     return packets;

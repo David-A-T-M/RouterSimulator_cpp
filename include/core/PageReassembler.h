@@ -16,9 +16,10 @@ constexpr size_t MAX_ASSEMBLER_TTL = 250; /**< Maximum TTL for a PageReassembler
  */
 class PageReassembler {
     size_t pageID;    /**< ID of the page being reassembled */
+    IPAddress srcIP;  /**< Source IP of the page */
     size_t total;     /**< Total number of packets expected */
     size_t count;     /**< Number of packets received so far */
-    size_t expTick;   /**< System tick at which this reassembler should expire if not completed */
+    size_t timeout;   /**< System tick at which this reassembler should expire if not completed */
     Packet** packets; /**< Array of pointers to received packets, indexed by their position */
 
 public:
@@ -26,12 +27,13 @@ public:
     /**
      * @brief Constructor for PageReassembler.
      *
-     * @param pageID ID of the page being reassembled.
+     * @param id ID of the page being reassembled.
+     * @param ip Source IP address of the page being reassembled.
      * @param length Total number of packets expected for the page (must be > 0).
-     * @param expTick System tick at which this reassembler should expire if not completed.
+     * @param timeout System tick at which this reassembler should expire if not completed.
      * @throws std::invalid_argument if length is 0.
      */
-    PageReassembler(size_t pageID, size_t length, size_t expTick);
+    PageReassembler(size_t id, IPAddress ip, size_t length, size_t timeout);
 
     /**
      * @brief Deleted Copy constructor.
@@ -74,6 +76,13 @@ public:
     [[nodiscard]] size_t getPageID() const noexcept;
 
     /**
+     * @brief Gets the source IP address associated with this reassembler.
+     *
+     * @return Source IP address of the page being reassembled.
+     */
+    [[nodiscard]] IPAddress getSrcIP() const noexcept;
+
+    /**
      * @brief Gets the total number of packets expected for this page.
      *
      * @return Total number of packets expected to complete the page.
@@ -92,7 +101,7 @@ public:
      *
      * @return System tick at which this reassembler should expire if not completed.
      */
-    [[nodiscard]] size_t getExpTick() const noexcept;
+    [[nodiscard]] size_t getTimeout() const noexcept;
 
     /**
      * @brief Gets the completion rate for this page.
@@ -198,6 +207,10 @@ inline size_t PageReassembler::getPageID() const noexcept {
     return pageID;
 }
 
+inline IPAddress PageReassembler::getSrcIP() const noexcept {
+    return srcIP;
+}
+
 inline size_t PageReassembler::getTotalPackets() const noexcept {
     return total;
 }
@@ -206,8 +219,8 @@ inline size_t PageReassembler::getReceivedPackets() const noexcept {
     return count;
 }
 
-inline size_t PageReassembler::getExpTick() const noexcept {
-    return expTick;
+inline size_t PageReassembler::getTimeout() const noexcept {
+    return timeout;
 }
 
 inline double PageReassembler::getCompletionRate() const {

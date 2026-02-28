@@ -159,7 +159,7 @@ TEST_F(PageTest, ToPackets_Basic) {
         EXPECT_EQ(packets[i].getPageLen(), 5);
         EXPECT_EQ(packets[i].getSrcIP(), src);
         EXPECT_EQ(packets[i].getDstIP(), dst);
-        EXPECT_EQ(packets[i].getExpTick(), TICK);
+        EXPECT_EQ(packets[i].getTimeout(), TICK);
     }
 }
 

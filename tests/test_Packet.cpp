@@ -20,7 +20,7 @@ TEST_F(PacketTest, Constructor_Valid) {
     EXPECT_EQ(packet.getPageLen(), 10);
     EXPECT_EQ(packet.getSrcIP(), src);
     EXPECT_EQ(packet.getDstIP(), dst);
-    EXPECT_EQ(packet.getExpTick(), TICK);
+    EXPECT_EQ(packet.getTimeout(), TICK);
 }
 
 TEST_F(PacketTest, Constructor_InvalidPagePos) {
@@ -90,7 +90,7 @@ TEST_F(PacketTest, Getters_All) {
     EXPECT_EQ(packet.getPageLen(), 20);
     EXPECT_EQ(packet.getDstIP(), dst);
     EXPECT_EQ(packet.getSrcIP(), src);
-    EXPECT_EQ(packet.getExpTick(), TICK);
+    EXPECT_EQ(packet.getTimeout(), TICK);
 }
 
 // =============== Query tests ===============
