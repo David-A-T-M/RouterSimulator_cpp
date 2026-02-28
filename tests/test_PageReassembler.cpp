@@ -2,215 +2,176 @@
 #include "core/Page.h"
 #include "core/PageReassembler.h"
 
-// ===============  Constructor tests ===============
-TEST(PageReassemblerConstructor, ValidConstructor) {
-    const PageReassembler reassembler(100, 10);
+class TestPageReassembler : public ::testing::Test {
+protected:
+    const IPAddress src{20, 15};
+    const IPAddress dst{10, 5};
+    static constexpr size_t TICK = 100;
+    PageReassembler reassembler{100, src, 10, TICK};
+};
 
-    EXPECT_EQ(reassembler.pageID, 100);
-    EXPECT_EQ(reassembler.expectedPackets, 10);
-    EXPECT_EQ(reassembler.currentPackets, 0);
+// ===============  Constructor tests ===============
+TEST_F(TestPageReassembler, Constructor_Valid) {
+    EXPECT_EQ(reassembler.getPageID(), 100);
+    EXPECT_EQ(reassembler.getTotalPackets(), 10);
+    EXPECT_EQ(reassembler.getReceivedPackets(), 0);
     EXPECT_FALSE(reassembler.isComplete());
 }
 
+TEST_F(TestPageReassembler, Constructor_Move) {
+    reassembler.addPacket(Packet(100, 0, 10, src, dst, TICK));
+    reassembler.addPacket(Packet(100, 1, 10, src, dst, TICK));
+
+    const PageReassembler moved(std::move(reassembler));
+
+    EXPECT_EQ(moved.getPageID(), 100);
+    EXPECT_EQ(moved.getTotalPackets(), 10);
+    EXPECT_EQ(moved.getReceivedPackets(), 2);
+    EXPECT_TRUE(moved.hasPacketAt(0));
+    EXPECT_TRUE(moved.hasPacketAt(1));
+    EXPECT_FALSE(moved.isComplete());
+}
+
+TEST_F(TestPageReassembler, Assignment_Move) {
+    PageReassembler otherPR(2, src, 10, TICK);
+
+    reassembler = std::move(otherPR);
+
+    EXPECT_EQ(reassembler.getPageID(), 2);
+    EXPECT_EQ(reassembler.getTotalPackets(), 10);
+}
+
+TEST_F(TestPageReassembler, Move_SelfAssignment) {
+    PageReassembler& ref = reassembler;
+    EXPECT_NO_THROW(reassembler = std::move(ref));
+
+    EXPECT_EQ(reassembler.getPageID(), 100);
+}
+
 // =============== Getters tests ===============
-TEST(PageReassemblerGetters, GetCompletionRate) {
-    const IPAddress origin(10, 5);
-    const IPAddress dest(20, 10);
-
-    PageReassembler reassembler(100, 10);
-
+TEST_F(TestPageReassembler, Getter_CompletionRate) {
     EXPECT_DOUBLE_EQ(reassembler.getCompletionRate(), 0.0);
 
     for (int i = 0; i < 5; ++i) {
-        reassembler.addPacket(Packet(100, i, 10, 0, dest, origin));
+        reassembler.addPacket(Packet(100, i, 10, src, dst, TICK));
     }
 
     EXPECT_DOUBLE_EQ(reassembler.getCompletionRate(), 0.5);
 
     for (int i = 5; i < 10; ++i) {
-        reassembler.addPacket(Packet(100, i, 10, 0, dest, origin));
+        reassembler.addPacket(Packet(100, i, 10, src, dst, TICK));
     }
 
     EXPECT_DOUBLE_EQ(reassembler.getCompletionRate(), 1.0);
 }
 
-TEST(PageReassemblerGetters, GetRemainingPackets) {
-    const IPAddress origin(10, 5);
-    const IPAddress dest(20, 10);
-
-    PageReassembler reassembler(100, 10);
-
+TEST_F(TestPageReassembler, Getter_RemainingPackets) {
     EXPECT_EQ(reassembler.getRemainingPackets(), 10);
 
-    reassembler.addPacket(Packet(100, 0, 10, 0, dest, origin));
+    reassembler.addPacket(Packet(100, 0, 10, src, dst, TICK));
     EXPECT_EQ(reassembler.getRemainingPackets(), 9);
 
-    reassembler.addPacket(Packet(100, 5, 10, 0, dest, origin));
+    reassembler.addPacket(Packet(100, 5, 10, src, dst, TICK));
     EXPECT_EQ(reassembler.getRemainingPackets(), 8);
 }
 
 // =============== Query tests ===============
-TEST(PageReassemblerQuery, IsCompleteEmpty) {
-    const PageReassembler reassembler(100, 5);
+TEST_F(TestPageReassembler, IsComplete_Empty) {
     EXPECT_FALSE(reassembler.isComplete());
 }
 
-TEST(PageReassemblerQuery, IsCompletePartial) {
-    const IPAddress origin(10, 5);
-    const IPAddress dest(20, 10);
-
-    PageReassembler reassembler(100, 5);
-
-    reassembler.addPacket(Packet(100, 0, 5, 0, dest, origin));
-    reassembler.addPacket(Packet(100, 1, 5, 0, dest, origin));
+TEST_F(TestPageReassembler, IsComplete_Partial) {
+    reassembler.addPacket(Packet(100, 0, 5, src, dst, TICK));
+    reassembler.addPacket(Packet(100, 1, 5, src, dst, TICK));
 
     EXPECT_FALSE(reassembler.isComplete());
 }
 
-TEST(PageReassemblerQuery, IsCompleteFull) {
-    const IPAddress origin(10, 5);
-    const IPAddress dest(20, 10);
-
-    PageReassembler reassembler(100, 3);
-
-    for (int i = 0; i < 3; ++i) {
-        reassembler.addPacket(Packet(100, i, 3, 0, dest, origin));
+TEST_F(TestPageReassembler, IsComplete_Full) {
+    for (int i = 0; i < 10; ++i) {
+        reassembler.addPacket(Packet(100, i, 10, src, dst, TICK));
     }
 
     EXPECT_TRUE(reassembler.isComplete());
 }
 
-TEST(PageReassemblerQuery, HasPacketAt) {
-    const IPAddress origin(10, 5);
-    const IPAddress dest(20, 10);
-
-    PageReassembler reassembler(100, 5);
-
+TEST_F(TestPageReassembler, HasPacketAt_Valid) {
     EXPECT_FALSE(reassembler.hasPacketAt(0));
     EXPECT_FALSE(reassembler.hasPacketAt(2));
 
-    reassembler.addPacket(Packet(100, 0, 5, 0, dest, origin));
-    reassembler.addPacket(Packet(100, 2, 5, 0, dest, origin));
+    reassembler.addPacket(Packet(100, 0, 10, src, dst, TICK));
+    reassembler.addPacket(Packet(100, 2, 10, src, dst, TICK));
 
     EXPECT_TRUE(reassembler.hasPacketAt(0));
     EXPECT_FALSE(reassembler.hasPacketAt(1));
     EXPECT_TRUE(reassembler.hasPacketAt(2));
-    EXPECT_FALSE(reassembler.hasPacketAt(3));
+    EXPECT_THROW((void)reassembler.hasPacketAt(10), std::out_of_range);
 }
 
-TEST(PageReassemblerQuery, HasPacketAtInvalidPosition) {
-    const PageReassembler reassembler(100, 5);
-
+TEST_F(TestPageReassembler, HasPacket_InvalidPos) {
     EXPECT_THROW((void)reassembler.hasPacketAt(10), std::out_of_range);
 }
 
 // =============== Modifiers tests ===============
-TEST(PageReassemblerModifiers, AddPacketInOrder) {
-    const IPAddress origin(10, 5);
-    const IPAddress dest(20, 10);
+TEST_F(TestPageReassembler, AddPacket_Ordered) {
+    PageReassembler otherPR(100, src, 3, TICK);
+    const Packet p0(100, 0, 3, src, dst, TICK);
+    const Packet p1(100, 1, 3, src, dst, TICK);
+    const Packet p2(100, 2, 3, src, dst, TICK);
 
-    PageReassembler reassembler(100, 3);
+    EXPECT_TRUE(otherPR.addPacket(p0));
+    EXPECT_EQ(otherPR.getReceivedPackets(), 1);
 
-    const Packet p0(100, 0, 3, 0, dest, origin);
-    const Packet p1(100, 1, 3, 0, dest, origin);
-    const Packet p2(100, 2, 3, 0, dest, origin);
+    EXPECT_TRUE(otherPR.addPacket(p1));
+    EXPECT_EQ(otherPR.getReceivedPackets(), 2);
+    EXPECT_TRUE(otherPR.addPacket(p2));
+    EXPECT_EQ(otherPR.getReceivedPackets(), 3);
 
-    EXPECT_TRUE(reassembler.addPacket(p0));
-    EXPECT_EQ(reassembler.currentPackets, 1);
+    EXPECT_TRUE(otherPR.isComplete());
+}
 
-    EXPECT_TRUE(reassembler.addPacket(p1));
-    EXPECT_EQ(reassembler.currentPackets, 2);
+TEST_F(TestPageReassembler, AddPacket_Unordered) {
+    const int arrivalOrder[] = {3, 7, 1, 9, 0, 5, 2, 8, 4, 6};
 
-    EXPECT_TRUE(reassembler.addPacket(p2));
-    EXPECT_EQ(reassembler.currentPackets, 3);
+    for (int i = 0; i < 10; ++i) {
+        const int pos = arrivalOrder[i];
+        Packet p(100, pos, 10, src, dst, TICK);
+
+        EXPECT_TRUE(reassembler.addPacket(p));
+        EXPECT_EQ(reassembler.getReceivedPackets(), i + 1);
+    }
 
     EXPECT_TRUE(reassembler.isComplete());
 }
 
-TEST(PageReassemblerModifiers, AddPacketOutOfOrder) {
-    const IPAddress origin(10, 5);
-    const IPAddress dest(20, 10);
-
-    PageReassembler reassembler(100, 5);
-
-    EXPECT_TRUE(reassembler.addPacket(Packet(100, 2, 5, 0, dest, origin)));
-    EXPECT_EQ(reassembler.currentPackets, 1);
-
-    EXPECT_TRUE(reassembler.addPacket(Packet(100, 0, 5, 0, dest, origin)));
-    EXPECT_EQ(reassembler.currentPackets, 2);
-
-    EXPECT_TRUE(reassembler.addPacket(Packet(100, 4, 5, 0, dest, origin)));
-    EXPECT_EQ(reassembler.currentPackets, 3);
-
-    EXPECT_TRUE(reassembler.addPacket(Packet(100, 1, 5, 0, dest, origin)));
-    EXPECT_EQ(reassembler.currentPackets, 4);
-
-    EXPECT_TRUE(reassembler.addPacket(Packet(100, 3, 5, 0, dest, origin)));
-    EXPECT_EQ(reassembler.currentPackets, 5);
-
-    EXPECT_TRUE(reassembler.isComplete());
-}
-
-TEST(PageReassemblerModifiers, AddPacketWrongPageID) {
-    const IPAddress origin(10, 5);
-    const IPAddress dest(20, 10);
-
-    PageReassembler reassembler(100, 3);
-
-    const Packet wrongPacket(200, 0, 3, 0, dest, origin);
+TEST_F(TestPageReassembler, AddPacket_WrongPageID) {
+    const Packet wrongPacket(200, 0, 10, src, dst, TICK);
 
     EXPECT_FALSE(reassembler.addPacket(wrongPacket));
-    EXPECT_EQ(reassembler.currentPackets, 0);
+    EXPECT_EQ(reassembler.getReceivedPackets(), 0);
 }
 
-TEST(PageReassemblerModifiers, AddPacketWrongPageLength) {
-    const IPAddress origin(10, 5);
-    const IPAddress dest(20, 10);
-
-    PageReassembler reassembler(100, 5);
-
-    const Packet wrongPacket(100, 0, 10, 0, dest, origin);
+TEST_F(TestPageReassembler, AddPacket_WrongPageLen) {
+    const Packet wrongPacket(100, 0, 5, src, dst, TICK);
 
     EXPECT_FALSE(reassembler.addPacket(wrongPacket));
-    EXPECT_EQ(reassembler.currentPackets, 0);
+    EXPECT_EQ(reassembler.getReceivedPackets(), 0);
 }
 
-TEST(PageReassemblerModifiers, AddPacketInvalidPosition) {
-    const IPAddress origin(10, 5);
-    const IPAddress dest(20, 10);
-
-    PageReassembler reassembler(100, 5);
-
-    const Packet invalidPacket(100, 9, 10, 0, dest, origin);
-
-    EXPECT_FALSE(reassembler.addPacket(invalidPacket));
-    EXPECT_EQ(reassembler.currentPackets, 0);
-}
-
-TEST(PageReassemblerModifiers, AddPacketDuplicate) {
-    const IPAddress origin(10, 5);
-    const IPAddress dest(20, 10);
-
-    PageReassembler reassembler(100, 3);
-
-    const Packet p0(100, 0, 3, 0, dest, origin);
+TEST_F(TestPageReassembler, AddPacket_Duplicate) {
+    const Packet p0(100, 0, 10, src, dst, TICK);
 
     EXPECT_TRUE(reassembler.addPacket(p0));
-    EXPECT_EQ(reassembler.currentPackets, 1);
+    EXPECT_EQ(reassembler.getReceivedPackets(), 1);
 
     EXPECT_FALSE(reassembler.addPacket(p0));
-    EXPECT_EQ(reassembler.currentPackets, 1);
+    EXPECT_EQ(reassembler.getReceivedPackets(), 1);
 }
 
-TEST(PageReassemblerModifiers, PackageComplete) {
-    const IPAddress origin(10, 5);
-    const IPAddress dest(20, 10);
-
-    PageReassembler reassembler(100, 5);
-
+TEST_F(TestPageReassembler, Package_Complete) {
     // Add packets in any order
-    for (int i = 4; i >= 0; --i) {
-        reassembler.addPacket(Packet(100, i, 5, 0, dest, origin));
+    for (int i = 9; i >= 0; --i) {
+        reassembler.addPacket(Packet(100, i, 10, src, dst, TICK));
     }
 
     EXPECT_TRUE(reassembler.isComplete());
@@ -218,119 +179,86 @@ TEST(PageReassemblerModifiers, PackageComplete) {
     List<Packet> packetList = reassembler.package();
 
     // Expect packets in order
-    EXPECT_EQ(packetList.size(), 5);
-    for (int i = 0; i < 5; ++i) {
-        EXPECT_EQ(packetList[i].getPagePosition(), i);
+    EXPECT_EQ(packetList.size(), 10);
+    for (int i = 0; i < 10; ++i) {
+        EXPECT_EQ(packetList[i].getPagePos(), i);
         EXPECT_EQ(packetList[i].getPageID(), 100);
     }
 
-    EXPECT_EQ(reassembler.currentPackets, 0);
+    EXPECT_EQ(reassembler.getReceivedPackets(), 0);
 }
 
-TEST(PageReassemblerModifiers, PackageIncomplete) {
-    const IPAddress origin(10, 5);
-    const IPAddress dest(20, 10);
-
-    PageReassembler reassembler(100, 5);
-
-    reassembler.addPacket(Packet(100, 0, 5, 0, dest, origin));
-    reassembler.addPacket(Packet(100, 1, 5, 0, dest, origin));
-    reassembler.addPacket(Packet(100, 2, 5, 0, dest, origin));
+TEST_F(TestPageReassembler, Package_Incomplete) {
+    reassembler.addPacket(Packet(100, 0, 5, src, dst, TICK));
+    reassembler.addPacket(Packet(100, 1, 5, src, dst, TICK));
+    reassembler.addPacket(Packet(100, 2, 5, src, dst, TICK));
 
     EXPECT_FALSE(reassembler.isComplete());
 
     EXPECT_THROW(reassembler.package(), std::runtime_error);
 }
 
-TEST(PageReassemblerModifiers, PackageSinglePacket) {
-    const IPAddress origin(10, 5);
-    const IPAddress dest(20, 10);
+TEST_F(TestPageReassembler, Package_SinglePacket) {
+    PageReassembler otherPR(100, src, 1, TICK);
+    otherPR.addPacket(Packet(100, 0, 1, src, dst, TICK));
 
-    PageReassembler reassembler(100, 1);
+    EXPECT_TRUE(otherPR.isComplete());
 
-    reassembler.addPacket(Packet(100, 0, 1, 0, dest, origin));
-
-    EXPECT_TRUE(reassembler.isComplete());
-
-    List<Packet> packetList = reassembler.package();
+    List<Packet> packetList = otherPR.package();
 
     EXPECT_EQ(packetList.size(), 1);
-    EXPECT_EQ(packetList[0].getPagePosition(), 0);
+    EXPECT_EQ(packetList[0].getPagePos(), 0);
 }
 
-TEST(PageReassemblerModifiers, PackagePreservesPacketData) {
-    const IPAddress origin(10, 5);
-    const IPAddress dest(20, 10);
-
-    PageReassembler reassembler(42, 3);
-
-    reassembler.addPacket(Packet(42, 0, 3, 5, dest, origin));
-    reassembler.addPacket(Packet(42, 1, 3, 3, dest, origin));
-    reassembler.addPacket(Packet(42, 2, 3, 8, dest, origin));
+TEST_F(TestPageReassembler, Package_PreservesPacketData) {
+    for (int i = 0; i < 10; ++i) {
+        reassembler.addPacket(Packet(100, i, 10, src, dst, TICK));
+    }
 
     List<Packet> packetList = reassembler.package();
 
-    EXPECT_EQ(packetList[0].getRouterPriority(), 5);
-    EXPECT_EQ(packetList[1].getRouterPriority(), 3);
-    EXPECT_EQ(packetList[2].getRouterPriority(), 8);
-
-    EXPECT_EQ(packetList[0].getOriginIP(), origin);
-    EXPECT_EQ(packetList[0].getDestinationIP(), dest);
+    EXPECT_EQ(packetList[0].getSrcIP(), src);
+    EXPECT_EQ(packetList[0].getDstIP(), dst);
 }
 
-TEST(PageReassemblerModifiers, Reset) {
-    const IPAddress origin(10, 5);
-    const IPAddress dest(20, 10);
+TEST_F(TestPageReassembler, Reset_) {
+    reassembler.addPacket(Packet(100, 0, 10, src, dst, TICK));
+    reassembler.addPacket(Packet(100, 2, 10, src, dst, TICK));
+    reassembler.addPacket(Packet(100, 4, 10, src, dst, TICK));
 
-    PageReassembler reassembler(100, 5);
-
-    reassembler.addPacket(Packet(100, 0, 5, 0, dest, origin));
-    reassembler.addPacket(Packet(100, 2, 5, 0, dest, origin));
-    reassembler.addPacket(Packet(100, 4, 5, 0, dest, origin));
-
-    EXPECT_EQ(reassembler.currentPackets, 3);
+    EXPECT_EQ(reassembler.getReceivedPackets(), 3);
 
     reassembler.reset();
 
-    EXPECT_EQ(reassembler.currentPackets, 0);
+    EXPECT_EQ(reassembler.getReceivedPackets(), 0);
     EXPECT_FALSE(reassembler.hasPacketAt(0));
     EXPECT_FALSE(reassembler.hasPacketAt(2));
     EXPECT_FALSE(reassembler.hasPacketAt(4));
 }
 
-TEST(PageReassemblerModifiers, ResetAndReuse) {
-    const IPAddress origin(10, 5);
-    const IPAddress dest(20, 10);
-
-    PageReassembler reassembler(100, 3);
-
-    reassembler.addPacket(Packet(100, 0, 3, 0, dest, origin));
-    reassembler.addPacket(Packet(100, 1, 3, 0, dest, origin));
+TEST_F(TestPageReassembler, Reset_Reuse) {
+    reassembler.addPacket(Packet(100, 0, 10, src, dst, TICK));
+    reassembler.addPacket(Packet(100, 1, 10, src, dst, TICK));
 
     reassembler.reset();
 
-    EXPECT_TRUE(reassembler.addPacket(Packet(100, 0, 3, 0, dest, origin)));
-    EXPECT_TRUE(reassembler.addPacket(Packet(100, 1, 3, 0, dest, origin)));
-    EXPECT_TRUE(reassembler.addPacket(Packet(100, 2, 3, 0, dest, origin)));
+    for (int i = 0; i < 10; ++i) {
+        EXPECT_TRUE(reassembler.addPacket(Packet(100, i, 10, src, dst, TICK)));
+    }
 
     EXPECT_TRUE(reassembler.isComplete());
 }
 
 // =============== Complex tests ===============
-TEST(PageReassemblerComplex, SimulateNetworkTransmission) {
-    const IPAddress terminalA(5, 10);
-    const IPAddress terminalB(8, 20);
-
-    PageReassembler reassembler(999, 10);
-
+TEST_F(TestPageReassembler, SimulateNetworkTransmission) {
     const int arrivalOrder[] = {3, 7, 1, 9, 0, 5, 2, 8, 4, 6};
 
     for (int i = 0; i < 10; ++i) {
         const int pos = arrivalOrder[i];
-        Packet p(999, pos, 10, i, terminalB, terminalA);
+        Packet p(100, pos, 10, src, dst, TICK);
 
         EXPECT_TRUE(reassembler.addPacket(p));
-        EXPECT_EQ(reassembler.currentPackets, i + 1);
+        EXPECT_EQ(reassembler.getReceivedPackets(), i + 1);
     }
 
     EXPECT_TRUE(reassembler.isComplete());
@@ -339,68 +267,49 @@ TEST(PageReassemblerComplex, SimulateNetworkTransmission) {
 
     EXPECT_EQ(orderedPackets.size(), 10);
     for (int i = 0; i < 10; ++i) {
-        EXPECT_EQ(orderedPackets[i].getPagePosition(), i);
+        EXPECT_EQ(orderedPackets[i].getPagePos(), i);
     }
 }
 
-TEST(PageReassemblerComplex, SimulatePacketLoss) {
-    const IPAddress origin(10, 5);
-    const IPAddress dest(20, 10);
+TEST_F(TestPageReassembler, SimulatePacketLoss) {
+    reassembler.addPacket(Packet(100, 0, 10, src, dst, TICK));
+    reassembler.addPacket(Packet(100, 2, 10, src, dst, TICK));
+    reassembler.addPacket(Packet(100, 5, 10, src, dst, TICK));
+    reassembler.addPacket(Packet(100, 8, 10, src, dst, TICK));
 
-    PageReassembler reassembler(100, 10);
-
-    reassembler.addPacket(Packet(100, 0, 10, 0, dest, origin));
-    reassembler.addPacket(Packet(100, 2, 10, 0, dest, origin));
-    reassembler.addPacket(Packet(100, 5, 10, 0, dest, origin));
-    reassembler.addPacket(Packet(100, 8, 10, 0, dest, origin));
-
-    EXPECT_EQ(reassembler.currentPackets, 4);
+    EXPECT_EQ(reassembler.getReceivedPackets(), 4);
     EXPECT_FALSE(reassembler.isComplete());
     EXPECT_DOUBLE_EQ(reassembler.getCompletionRate(), 0.4);
 
     EXPECT_THROW(reassembler.package(), std::runtime_error);
 }
 
-TEST(PageReassemblerComplex, SimulateRetransmission) {
-    const IPAddress origin(10, 5);
-    const IPAddress dest(20, 10);
+TEST_F(TestPageReassembler, SimulateRetransmission) {
+    reassembler.addPacket(Packet(100, 0, 10, src, dst, TICK));
 
-    PageReassembler reassembler(100, 3);
+    EXPECT_FALSE(reassembler.addPacket(Packet(100, 0, 3, src, dst, TICK)));
 
-    reassembler.addPacket(Packet(100, 0, 3, 0, dest, origin));
-
-    EXPECT_FALSE(reassembler.addPacket(Packet(100, 0, 3, 0, dest, origin)));
-
-    EXPECT_EQ(reassembler.currentPackets, 1);
+    EXPECT_EQ(reassembler.getReceivedPackets(), 1);
 }
 
-TEST(PageReassemblerComplex, MultiplePages) {
-    const IPAddress origin(10, 5);
-    const IPAddress dest(20, 10);
+TEST_F(TestPageReassembler, MultiplePages) {
+    PageReassembler reassembler2(200, src, 3, TICK);
+    PageReassembler reassembler3(300, src, 7, TICK);
 
-    PageReassembler page1(100, 5);
-    PageReassembler page2(200, 3);
-    PageReassembler page3(300, 7);
+    reassembler.addPacket(Packet(100, 0, 10, src, dst, TICK));
+    reassembler2.addPacket(Packet(200, 0, 3, src, dst, TICK));
+    reassembler3.addPacket(Packet(300, 0, 7, src, dst, TICK));
 
-    page1.addPacket(Packet(100, 0, 5, 0, dest, origin));
-    page2.addPacket(Packet(200, 0, 3, 0, dest, origin));
-    page3.addPacket(Packet(300, 0, 7, 0, dest, origin));
+    EXPECT_EQ(reassembler.getReceivedPackets(), 1);
+    EXPECT_EQ(reassembler2.getReceivedPackets(), 1);
+    EXPECT_EQ(reassembler3.getReceivedPackets(), 1);
 
-    EXPECT_EQ(page1.currentPackets, 1);
-    EXPECT_EQ(page2.currentPackets, 1);
-    EXPECT_EQ(page3.currentPackets, 1);
-
-    EXPECT_FALSE(page1.addPacket(Packet(200, 1, 5, 0, dest, origin)));
+    EXPECT_FALSE(reassembler.addPacket(Packet(200, 1, 5, src, dst, TICK)));
 }
 
-TEST(PageReassemblerComplex, IntegrationWithPage) {
-    const IPAddress origin(10, 5);
-    const IPAddress dest(20, 10);
-
-    PageReassembler reassembler(42, 5);
-
-    for (int i = 0; i < 5; ++i) {
-        reassembler.addPacket(Packet(42, i, 5, 0, dest, origin));
+TEST_F(TestPageReassembler, Integration_Page) {
+    for (int i = 0; i < 10; ++i) {
+        reassembler.addPacket(Packet(100, i, 10, src, dst, TICK));
     }
 
     EXPECT_TRUE(reassembler.isComplete());
@@ -409,8 +318,8 @@ TEST(PageReassemblerComplex, IntegrationWithPage) {
 
     const Page reconstructedPage(std::move(packets));
 
-    EXPECT_EQ(reconstructedPage.getPageID(), 42);
-    EXPECT_EQ(reconstructedPage.getPageLength(), 5);
-    EXPECT_EQ(reconstructedPage.getOriginIP(), origin);
-    EXPECT_EQ(reconstructedPage.getDestinationIP(), dest);
+    EXPECT_EQ(reconstructedPage.getPageID(), 100);
+    EXPECT_EQ(reconstructedPage.getPageLen(), 10);
+    EXPECT_EQ(reconstructedPage.getSrcIP(), src);
+    EXPECT_EQ(reconstructedPage.getDstIP(), dst);
 }

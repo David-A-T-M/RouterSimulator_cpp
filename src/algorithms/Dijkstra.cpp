@@ -4,7 +4,8 @@
 
 #include "core/Router.h"
 
-RoutingTable DijkstraAlgorithm::computeRoutingTable(const List<const Router*>& routers, IPAddress sourceIP) {
+RoutingTable DijkstraAlgorithm::computeRoutingTable(const List<const Router*>& routers,
+                                                    IPAddress sourceIP) {
     const size_t routerCount = routers.size();
     // Initialize distances, visited and parents
     List<DistanceInfo> distances;
@@ -21,28 +22,27 @@ RoutingTable DijkstraAlgorithm::computeRoutingTable(const List<const Router*>& r
 
     // Dijkstra's algorithm main loop
     for (size_t i = 0; i < routerCount; ++i) {
-        // Find unvisited router with minimum distance
+        // Find an unvisited router with minimum distance
         const size_t currentIndex = findMinDistance(distances, routerCount);
 
         if (currentIndex == std::numeric_limits<size_t>::max()) {
-            break;  // All reachable routers visited, exit main loop
+            break;  // All reachable routers visited, exit the main loop
         }
 
-        distances[currentIndex].visited = true;  // Mark current router as visited
+        distances[currentIndex].visited = true;  // Mark the current router as visited
 
         // Get connections of the current router
-        auto conn = routers[currentIndex]->getConnections();
+        auto neighborIPs = routers[currentIndex]->getNeighborIPs();
         // Update distances for neighbors
-        for (const auto& connection : conn) {
-            const IPAddress neighborIP = connection.router->getIP();
+        for (const IPAddress& neighborIP : neighborIPs) {
             const size_t neighborIndex = getRouterIndex(routers, neighborIP);
-
             if (distances[neighborIndex].visited) {
-                continue;  // Skip already visited neighbors
+                continue;
             }
 
-            const size_t newDist = distances[currentIndex].distance + connection.outputBuffer.size();
-            // If a shorter path through current router is found, update distance and parent
+            const size_t bufferLoad = routers[currentIndex]->getNeighborBufferUsage(neighborIP);
+            const size_t newDist    = distances[currentIndex].distance + bufferLoad;
+
             if (newDist < distances[neighborIndex].distance) {
                 distances[neighborIndex].distance = newDist;
                 distances[neighborIndex].parent   = routers[currentIndex]->getIP();
@@ -81,7 +81,8 @@ RoutingTable DijkstraAlgorithm::computeRoutingTable(const List<const Router*>& r
     return routingTable;
 }
 
-void DijkstraAlgorithm::computeAllRoutingTables(const List<const Router*>& routers, List<RoutingTable>& tables) {
+void DijkstraAlgorithm::computeAllRoutingTables(const List<const Router*>& routers,
+                                                List<RoutingTable>& tables) {
     tables.clear();
 
     for (const auto* router : routers) {
@@ -92,8 +93,8 @@ void DijkstraAlgorithm::computeAllRoutingTables(const List<const Router*>& route
 }
 
 size_t DijkstraAlgorithm::getRouterIndex(const List<const Router*>& routers, IPAddress routerIP) {
-    const auto it =
-        std::find_if(routers.begin(), routers.end(), [&routerIP](const auto& r) { return r->getIP() == routerIP; });
+    const auto it = std::find_if(routers.begin(), routers.end(),
+                                 [&routerIP](const auto& r) { return r->getIP() == routerIP; });
 
     if (it == routers.end()) {
         throw std::runtime_error("No such router");

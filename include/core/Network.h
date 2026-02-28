@@ -1,0 +1,225 @@
+#pragma once
+
+#include <random>
+
+#include "Router.h"
+#include "algorithms/Dijkstra.h"
+
+/**
+ * @class Network
+ * @brief Represents a network of routers and terminals, managing the overall topology, traffic
+ * generation, and simulation of packet flow through the network.
+ *
+ * The Network class is responsible for initializing a random network topology based on specified
+ * parameters, simulating the passage of time (ticks) where routers and terminals process their
+ * queues, and recalculating routing tables as needed. It maintains a list of all routers and an
+ * address book of terminal IPs for routing purposes.
+ */
+class Network {
+public:
+    /** Default number of routers in the network */
+    static constexpr size_t DEF_ROUTERS_COUNT = 20;
+    /** Default maximum number of terminals connected to each router */
+    static constexpr size_t DEF_MAX_TERMINALS = 10;
+    /** Default complexity level for additional connections between routers */
+    static constexpr size_t DEF_COMPLEXITY    = 5;
+    /** Default probability of generating traffic for terminals in each tick (0.0 to 1.0) */
+    static constexpr float DEF_PROBABILITY    = 0.5;
+    /** Default maximum page length for traffic generation for terminals */
+    static constexpr size_t DEF_MAX_PAGE_LEN  = 10;
+
+    /** Type alias for a unique pointer to a Router object. */
+    using RouterPtr = std::unique_ptr<Router>;
+
+    /**
+     * @struct Config
+     * @brief Configuration structure for initializing the network with specific parameters.
+     *
+     * This structure allows for easy specification of the number of routers, maximum terminals per
+     * router, complexity of the network topology, traffic generation probability, and maximum page
+     * length for traffic generation. It provides default values for all parameters, allowing for
+     * flexible initialization of the network.
+     */
+    struct Config {
+        /** Number of routers in the network */
+        uint8_t routerCount;
+        /** Maximum number of terminals that can be connected */
+        uint8_t maxTerminalCount;
+        /** Number of additional random connections to increase complexity */
+        size_t complexity;
+        /** Probability of generating traffic for terminals in each tick (0.0 to 1.0) */
+        float trafficProbability;
+        /** Maximum page length for traffic generation for terminals */
+        size_t maxPageLen;
+
+        /**
+         * @brief Default constructor for Config, initializes with default values.
+         */
+        Config()
+            : routerCount(DEF_ROUTERS_COUNT),
+              maxTerminalCount(DEF_MAX_TERMINALS),
+              complexity(DEF_COMPLEXITY),
+              trafficProbability(DEF_PROBABILITY),
+              maxPageLen(DEF_MAX_PAGE_LEN) {}
+
+        /**
+         * @brief Parameterized constructor for Config struct that allows custom settings.
+         *
+         * @param routerCount Number of routers in the network.
+         * @param maxTerminalCount Maximum number of terminals that can be connected to each router.
+         * @param complexity Number of additional random connections to increase complexity.
+         * @param trafficProbability Probability of generating traffic
+         * @param maxPageLen Maximum page length for traffic generation for terminals.
+         */
+        Config(uint8_t routerCount, uint8_t maxTerminalCount, size_t complexity,
+               float trafficProbability, size_t maxPageLen)
+            : routerCount(routerCount),
+              maxTerminalCount(maxTerminalCount),
+              complexity(complexity),
+              trafficProbability(trafficProbability),
+              maxPageLen(maxPageLen) {}
+    };
+
+private:
+    List<RouterPtr> routers;      /**< List of all routers in the network */
+    List<const Router*> cRouters; /**< List of raw pointers to routers for algorithm use */
+    List<IPAddress> addressBook;  /**< List of all terminal IPs in the network */
+    size_t currentTick;           /**< Current simulation tick, used for timing */
+    std::mt19937 m_rng{std::random_device{}()}; /**< Random number generator */
+
+public:
+    /**
+     * @brief Constructor for Network.
+     *
+     * @param config Configuration struct for initializing the network with specific parameters.
+     */
+    explicit Network(const Config& config = Config{});
+
+    /**
+     * @brief Destructor for Network, defaulted to allow automatic cleanup of resources.
+     */
+    ~Network() = default;
+
+    /**
+     * @brief Deleted copy constructor to prevent copying of the Network object.
+     */
+    Network(const Network&) = delete;
+
+    /**
+     * @brief Deleted copy assignment operator to prevent copying of the Network object.
+     *
+     * @return Reference to this Network object.
+     */
+    Network& operator=(const Network&) = delete;
+
+    /**
+     * @brief Deleted move constructor to prevent moving of the Network object.
+     */
+    Network(Network&&) = delete;
+
+    /**
+     * @brief Deleted move assignment operator to prevent moving of the Network object.
+     *
+     * @return Reference to this Network object.
+     */
+    Network& operator=(Network&&) = delete;
+
+    // =============== Initialization ===============
+    /**
+     * @brief Generates a random network topology based on the specified parameters.
+     *
+     * This method initializes the specified number of routers, connects them in a minimal spanning
+     * tree configuration to ensure basic connectivity, and then adds additional random connections
+     * to increase the complexity of the network. It also initializes terminals for each router and
+     * populates the address book with terminal IPs for routing purposes.
+     *
+     * @param routerCount Number of routers to create in the network.
+     * @param TerminalCount Maximum number of terminals that can be connected to each router.
+     * @param complexity Number of additional random connections to add for each router (0 for no
+     * extra connections).
+     * @param probability Probability of generating traffic for terminals in each tick (0.0 to 1.0).
+     * @param pageLen Maximum page length for traffic generation for terminals.
+     */
+    void generateRandomNetwork(uint8_t routerCount, uint8_t TerminalCount, size_t complexity,
+                               float probability, size_t pageLen);
+
+    /**
+     * @brief Adds additional random connections between routers to increase network complexity.
+     *
+     * The number of additional connections is determined by the `complexity` parameter, which
+     * specifies how many extra links each router should attempt to create with randomly selected
+     * target routers. This method ensures that the network has a more complex topology beyond the
+     * minimal spanning tree configuration.
+     *
+     * @param complexity Number of additional connections to add for each router (0 for no extra
+     * connections).
+     */
+    void addAdditionalConnections(size_t complexity = 1);
+
+    /**
+     * @brief Establishes a bidirectional link between two routers.
+     *
+     * @param rtrA Pointer to the first router.
+     * @param rtrB Pointer to the second router.
+     */
+    static void establishLink(Router* rtrA, Router* rtrB);
+
+    /**
+     * @brief Simulates the network for a specified number of ticks, allowing routers and terminals
+     * to process their queues and update their state. Each tick represents a cycle of operation
+     * where routers process their output buffers, local buffers, and terminals, and then process
+     * their input buffers. Routing tables are recalculated every 5 ticks to reflect any changes in
+     * the network topology or traffic patterns.
+     *
+     * @param ticks Number of simulation ticks to run.
+     */
+    void simulate(size_t ticks);
+
+    /**
+     * @brief Gets a list of raw pointers to the routers in the network for use in algorithms.
+     *
+     * This method returns a list of const pointers to the routers, which can be used by routing
+     * algorithms like Dijkstra's algorithm without allowing modification of the router objects.
+     *
+     * @return List of const pointers to the routers in the network.
+     */
+    const List<const Router*>& getRouters() const;
+
+private:
+    /**
+     * @brief Connects routers in a minimal spanning tree configuration to ensure basic
+     * connectivity.
+     *
+     * This method connects each router to at least one previously added router, creating a
+     * connected network with the minimum number of links. The connections are made randomly to
+     * create variability in the network topology.
+     *
+     * @param routerCount The total number of routers in the network.
+     */
+    void connectMinimal(uint8_t routerCount);
+
+    /**
+     * @brief Adds a new router to the network with the specified ID and maximum terminal count.
+     *
+     * @param rtrID Unique ID for the new router (must be > 0).
+     * @param TerminalCount Maximum number of terminals that can be connected to this router.
+     * @param probability Probability of generating traffic for terminals.
+     * @param PageLen Maximum page length for traffic generation for terminals.
+     */
+    void addRouter(uint8_t rtrID, uint8_t TerminalCount, float probability, size_t PageLen);
+
+    /**
+     * @brief Recalculates routing tables for all routers in the network using Dijkstra's algorithm.
+     */
+    void recalculateAllRoutes();
+
+    /**
+     * @brief Advances the simulation by one tick, allowing each router to process its queues and
+     * update its state.
+     */
+    void tick();
+};
+
+inline const List<const Router*>& Network::getRouters() const {
+    return cRouters;
+}

@@ -1,26 +1,31 @@
-#include "core/Router.h"
-
 #include <algorithm>
+#include <ranges>
 
+#include "core/Router.h"
 #include "core/Terminal.h"
 
-RouterConnection::RouterConnection(Router* r) : router(r), outputBuffer(PacketBuffer{r->getIP()}) {}
-
-Router::Router(IPAddress routerIP, size_t inputCapacity, size_t internalBW, size_t externalBW)
-    : ip(routerIP),
-      inputBuffer(PacketBuffer::Mode::FIFO, inputCapacity),
-      internalBW(internalBW),
-      externalBW(externalBW),
+Router::Router(IPAddress ip, size_t terminals, const Config& cfg)
+    : routerIP(ip),
+      outBufferCap(cfg.outBufferCap),
+      inBuffer(cfg.inBufferCap),
+      inProcCap(cfg.inProcCap),
+      locBuffer(cfg.locBufferCap),
+      locBufferBW(cfg.locBW),
+      outBufferBW(cfg.outBW),
       packetsReceived(0),
-      packetsDropped(0) {
+      packetsDropped(0),
+      packetsTimedOut(0),
+      packetsForwarded(0),
+      packetsDelivered(0) {
     if (!routerIP.isRouter()) {
         throw std::invalid_argument("Router IP must have terminalID = 0");
     }
+    initializeTerminals(terminals);
 }
 
 Router::~Router() = default;
 
-void Router::connectTerminal(TerminalPtr terminal) {
+bool Router::connectTerminal(TerminalPtr terminal) {
     if (!terminal) {
         throw std::invalid_argument("Terminal cannot be nullptr");
     }
@@ -33,78 +38,54 @@ void Router::connectTerminal(TerminalPtr terminal) {
         throw std::invalid_argument("Terminal does not belong to this router");
     }
 
-    terminals.pushBack(std::move(terminal));
+    const IPAddress terminalIP = terminal->getTerminalIP();
+    terminals[terminalIP]      = std::move(terminal);
+
+    return true;
 }
 
-void Router::connectRouter(Router* neighbor) {
+bool Router::connectRouter(Router* neighbor) {
     if (!neighbor) {
         throw std::invalid_argument("Neighbor router cannot be nullptr");
     }
 
-    if (routerIsConnected(neighbor->getIP())) {
-        throw std::invalid_argument("Router already connected");
-    }
-
-    connections.pushBack(RouterConnection(neighbor));
-}
-
-bool Router::disconnectRouter(const Router* neighbor) {
-    if (!neighbor) {
+    if (neighbor == this) {
         return false;
     }
 
-    const IPAddress neighborIP = neighbor->getIP();
+    auto [it, inserted] =
+        connections.try_emplace(neighbor->getIP(), RtrConnection(neighbor, outBufferCap));
+    return inserted;
+}
 
-    for (int i = 0; i < connections.size(); ++i) {
-        if (connections[i].router->getIP() == neighborIP) {
-            connections.removeAt(i);
-            return true;
-        }
+bool Router::receivePacket(const Packet& packet) {
+    packetsReceived++;
+
+    if (!inBuffer.enqueue(packet)) {
+        packetsDropped++;
+        return false;
     }
 
-    return false;
+    return true;
 }
 
-bool Router::receivePacket(Packet packet) {
-    assignPriority(packet);
-
-    if (inputBuffer.enqueue(packet)) {
-        packetsReceived++;
-        return true;
-    }
-    packetsDropped++;
-    return false;
-}
-
-void Router::tick() {
-    processInputBuffer();
-    processOutputBuffers();
-    processLocalBuffer();
-}
-
-size_t Router::processInputBuffer() {
-    size_t processed = 0;
-
-    while (processed < internalBW && !inputBuffer.isEmpty()) {
-        Packet packet = inputBuffer.dequeue();
-
-        routePacket(packet);
-        processed++;
-    }
-    return processed;
-}
-
-size_t Router::processOutputBuffers() {
+size_t Router::processOutputBuffers(size_t currentTick) {
     size_t totalSent = 0;
 
-    for (auto& conn : connections) {
+    for (auto& [rtr, buff] : connections | std::views::values) {
         size_t sent = 0;
+        while (sent < outBufferBW && !buff.isEmpty()) {
+            Packet packet = buff.dequeue();
 
-        while (sent < externalBW && !conn.outputBuffer.isEmpty()) {
-            Packet packet = conn.outputBuffer.dequeue();
+            if (packet.getTimeout() <= currentTick) {
+                packetsTimedOut++;
+                continue;
+            }
 
-            if (conn.router->receivePacket(packet)) {
+            if (rtr) {
+                rtr->receivePacket(packet);
                 sent++;
+                packetsForwarded++;
             } else {
                 packetsDropped++;
             }
@@ -116,45 +97,137 @@ size_t Router::processOutputBuffers() {
     return totalSent;
 }
 
-size_t Router::processLocalBuffer() {
+size_t Router::processLocalBuffer(size_t currentTick) {
     size_t delivered = 0;
 
-    while (delivered < internalBW && !localBuffer.isEmpty()) {
-        bool found = false;
+    while (delivered < locBufferBW && !locBuffer.isEmpty()) {
+        Packet packet = locBuffer.dequeue();
 
-        Packet packet = localBuffer.dequeue();
-        for (auto& terminal : terminals) {
-            if (terminal->getTerminalIP() == packet.getDestinationIP()) {
-                terminal->receivePacket(packet);
-                delivered++;
-                found = true;
-                break;
-            }
+        if (packet.getTimeout() <= currentTick) {
+            packetsTimedOut++;
+            continue;
         }
-        if (!found) {
+
+        auto it = terminals.find(packet.getDstIP());
+
+        if (it != terminals.end()) {
+            it->second->receivePacket(packet);
+            packetsDelivered++;
+            delivered++;
+        } else {
             packetsDropped++;
         }
     }
     return delivered;
 }
 
-size_t Router::getNeighborBufferUsage(IPAddress neighborIP) const {
-    const auto it = std::find_if(connections.begin(), connections.end(), [&neighborIP](const RouterConnection& rc) {
-        return rc.router->getIP() == neighborIP;
-    });
+void Router::tickTerminals(size_t currentTick) {
+    for (auto& terminal : terminals | std::views::values) {
+        if (terminal) {
+            terminal->tick(currentTick);
+        }
+    }
+}
 
-    if (it != connections.end()) {
-        return it->outputBuffer.size();
+size_t Router::processInputBuffer(size_t currentTick) {
+    size_t processed = 0;
+
+    while (processed < inProcCap && !inBuffer.isEmpty()) {
+        processed++;
+        Packet packet = inBuffer.dequeue();
+
+        if (packet.getTimeout() <= currentTick) {
+            packetsTimedOut++;
+            continue;
+        }
+
+        routePacket(packet);
+    }
+    return processed;
+}
+
+void Router::tick(size_t currentTick) {
+    processOutputBuffers(currentTick);
+    processLocalBuffer(currentTick);
+    tickTerminals(currentTick);
+    processInputBuffer(currentTick);
+}
+
+size_t Router::getPacketsOutPending() const noexcept {
+    return std::accumulate(connections.begin(), connections.end(), size_t{0},
+                           [](size_t acc, const auto& conn) {
+                               const auto& [rtr, rtrConn] = conn;
+                               return acc + rtrConn.outBuffer.size();
+                           });
+}
+
+size_t Router::getNeighborBufferUsage(IPAddress neighborIP) const {
+    if (const auto it = connections.find(neighborIP); it != connections.end()) {
+        return it->second.outBuffer.size();
     }
 
     return 0;
 }
 
+const Terminal* Router::getTerminal(IPAddress ip) const noexcept {
+    if (const auto it = terminals.find(ip); it != terminals.end()) {
+        return it->second.get();
+    }
+    return nullptr;
+}
+
+List<const Terminal*> Router::getTerminals() const noexcept {
+    List<const Terminal*> list;
+    for (const auto& terminal : terminals | std::views::values) {
+        list.pushBack(terminal.get());
+    }
+    return list;
+}
+
+List<IPAddress> Router::getNeighborIPs() const {
+    List<IPAddress> ips;
+    for (const auto& ip : connections | std::views::keys) {
+        ips.pushBack(ip);
+    }
+    return ips;
+}
+
+List<IPAddress> Router::getTerminalIPs() const {
+    List<IPAddress> ips;
+    for (const auto& ip : terminals | std::views::keys) {
+        ips.pushBack(ip);
+    }
+    return ips;
+}
+
+void Router::shareAddressBook(List<IPAddress>* terminalIPs) {
+    for (const auto& ip : terminals | std::views::values) {
+        ip->setAddressBook(terminalIPs);
+    }
+}
+
+void Router::shareRandomGenerator(std::mt19937* r_gen) {
+    for (const auto& ip : terminals | std::views::values) {
+        ip->setRandomGenerator(r_gen);
+    }
+}
+
+void Router::shareTrafficProbability(float probability) {
+    for (const auto& ip : terminals | std::views::values) {
+        ip->setTrafficProbability(probability);
+    }
+}
+
+void Router::shareMaxPageLength(size_t pageLen) {
+    for (const auto& ip : terminals | std::views::values) {
+        ip->setMaxPageLength(pageLen);
+    }
+}
+
 std::string Router::toString() const {
     std::ostringstream oss;
-    oss << "Router{IP=" << ip << ", InternalBW=" << internalBW << ", ExternalBW=" << externalBW
-        << ", PacketsReceived=" << packetsReceived << ", ConnectedTerminals=" << terminals.size()
-        << ", ConnectedRouters=" << connections.size() << "}";
+    oss << "Router{IP: " << routerIP << " | ConnectedTerminals: " << terminals.size()
+        << " | ConnectedRouters: " << connections.size() << "}";
     return oss.str();
 }
 
@@ -163,32 +236,34 @@ std::ostream& operator<<(std::ostream& os, const Router& router) {
     return os;
 }
 
-void Router::assignPriority(Packet& packet) const {
-    packet.setRouterPriority(packetsReceived % 1000000);
+void Router::initializeTerminals(size_t count) {
+    for (size_t i = 1; i <= count; ++i) {
+        auto terminal = std::make_unique<Terminal>(this, i);
+        IPAddress terminalIP(routerIP.getRouterIP(), i);
+        terminals[terminalIP] = std::move(terminal);
+    }
 }
 
 PacketBuffer* Router::getOutputBuffer(IPAddress nextIP) {
-    for (auto& conn : connections) {
-        if (conn.router->getIP() == nextIP) {
-            return &conn.outputBuffer;
-        }
+    if (const auto it = connections.find(nextIP); it != connections.end()) {
+        return &(it->second.outBuffer);
     }
     return nullptr;
 }
 
 bool Router::routePacket(const Packet& packet) {
-    IPAddress destIP = packet.getDestinationIP();
+    const IPAddress destIP = packet.getDstIP();
 
-    if (destIP.getRouterIP() == getIP().getRouterIP()) {
-        if (localBuffer.enqueue(packet)) {
+    if (destIP.getRouterIP() == routerIP.getRouterIP()) {
+        if (locBuffer.enqueue(packet)) {
             return true;
         }
         packetsDropped++;
         return false;
     }
 
-    IPAddress nextHopIP     = routingTable.getNextHopIP(destIP);
-    PacketBuffer* outBuffer = getOutputBuffer(nextHopIP);
+    const IPAddress nextHopIP = routingTable.getNextHopIP(destIP);
+    PacketBuffer* outBuffer   = getOutputBuffer(nextHopIP);
 
     if (!outBuffer) {
         packetsDropped++;
@@ -202,12 +277,10 @@ bool Router::routePacket(const Packet& packet) {
     return false;
 }
 
-bool Router::routerIsConnected(IPAddress neighborIP) const {
-    return std::any_of(connections.begin(), connections.end(),
-                       [&neighborIP](const RouterConnection& rc) { return rc.router->getIP() == neighborIP; });
+bool Router::routerIsConnected(const IPAddress& neighborIP) const {
+    return connections.contains(neighborIP);
 }
 
-bool Router::terminalIsConnected(IPAddress terminalIP) const {
-    return std::any_of(terminals.begin(), terminals.end(),
-                       [&terminalIP](const auto& tp) { return tp->getTerminalIP() == terminalIP; });
+bool Router::terminalIsConnected(const IPAddress& terminalIP) const {
+    return terminals.contains(terminalIP);
 }

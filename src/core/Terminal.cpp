@@ -1,148 +1,230 @@
-#include "core/Terminal.h"
-#include "core/Router.h"
+#include <algorithm>
 
-Terminal::Terminal(IPAddress ip, Router* router, size_t outputCapacity, size_t inputCapacity, size_t externalBW,
-                   size_t internalBW)
-    : ip(ip),
-      connectedRouter(router),
-      outputBuffer(PacketBuffer::Mode::FIFO, outputCapacity),
-      inputBuffer(PacketBuffer::Mode::FIFO, inputCapacity),
-      externalBW(externalBW),
-      internalBW(internalBW),
-      sentPages(0),
-      receivedPackets(0),
-      receivedPages(0),
-      nextPageID(0) {
-    if (!router) {
-        throw std::invalid_argument("Router cannot be nullptr");
-    }
-    if (router->getIP().getRouterIP() != ip.getRouterIP()) {
-        throw std::invalid_argument("Terminal does not belong to this router");
+#include "core/Page.h"
+#include "core/Router.h"
+#include "core/Terminal.h"
+
+Terminal::Terminal(Router* router, uint8_t terminalID, const Config& cfg)
+    : terminalIP(router->getIP().getRouterIP(), terminalID),
+      rtrConn(router),
+      inBuffer(cfg.inBufferCap),
+      inProcCap(cfg.inProcCap),
+      outBuffer(cfg.outBufferCap),
+      outBW(cfg.outputBW),
+      pagesCreated(0),
+      pagesSent(0),
+      pagesOutDropped(0),
+      pagesCompleted(0),
+      pagesTimedOut(0),
+      packetsGenerated(0),
+      packetsSent(0),
+      packetsOutDropped(0),
+      packetsOutTimedOut(0),
+      packetsReceived(0),
+      packetsInTimedOut(0),
+      packetsInDropped(0),
+      packetsSuccProcessed(0),
+      nextPageID(0),
+      addressBook(nullptr),
+      trafficProbability(0),
+      maxPageLen(0),
+      m_gen(nullptr) {
+    if (terminalID == 0) {
+        throw std::invalid_argument("Terminal ID must be greater than 0");
     }
 }
 
-bool Terminal::sendPage(size_t length, IPAddress destIP) {
-    const Page page(nextPageID++, length, ip, destIP);
+bool Terminal::sendPage(size_t length, IPAddress destIP, size_t timeout) {
+    const Page page(nextPageID++, length, terminalIP, destIP);
 
-    List<Packet> packets = page.fragmentToPackets();
+    List<Packet> packets  = page.toPackets(timeout);
+    const auto numPackets = packets.size();
+    pagesCreated++;
+    packetsGenerated += numPackets;
 
-    bool allEnqueued = true;
-
-    for (const auto& packet : packets) {
-        if (!outputBuffer.enqueue(packet)) {
-            allEnqueued = false;
-        }
+    if (outBuffer.availableSpace() < numPackets) {
+        pagesOutDropped++;
+        packetsOutDropped += numPackets;
+        return false;
     }
 
-    sentPages++;
+    for (const auto& packet : packets) {
+        outBuffer.enqueue(packet);
+    }
+    pagesSent++;
 
-    return allEnqueued;
+    return true;
 }
 
 bool Terminal::receivePacket(const Packet& packet) {
-    if (inputBuffer.enqueue(packet)) {
-        receivedPackets++;
-        return true;
-    }
-    return false;
-}
+    packetsReceived++;
 
-void Terminal::tick() {
-    processOutputBuffer();
-    processInputBuffer();
-}
-
-size_t Terminal::processOutputBuffer() {
-    size_t packetsSent = 0;
-
-    while (packetsSent < externalBW && !outputBuffer.isEmpty()) {
-        const Packet packet = outputBuffer.dequeue();
-
-        connectedRouter->receivePacket(packet);
-        packetsSent++;
+    if (isIDQuarantined(packet.getPageID())) {
+        packetsInTimedOut++;
+        return false;
     }
 
-    return packetsSent;
+    if (!inBuffer.enqueue(packet)) {
+        packetsInDropped++;
+        return false;
+    }
+
+    return true;
 }
 
-size_t Terminal::processInputBuffer() {
-    size_t packetsProcessed = 0;
+size_t Terminal::processInputBuffer(size_t currentTick) {
+    size_t processedCount = 0;
 
-    while (packetsProcessed < internalBW && !inputBuffer.isEmpty()) {
-        Packet packet = inputBuffer.dequeue();
+    while (processedCount < inProcCap && !inBuffer.isEmpty()) {
+        Packet packet = inBuffer.dequeue();
+        processedCount++;
 
-        if (packet.getDestinationIP() != ip) {
+        if (currentTick >= packet.getTimeout()) {
+            packetsInTimedOut++;
             continue;
         }
 
-        PageReassembler* reassembler = findOrCreateReassembler(packet.getPageID(), packet.getPageLength());
+        if (packet.getDstIP() != terminalIP) {
+            packetsInDropped++;
+            continue;
+        }
+
+        PageReassembler* reassembler =
+            findOrCreateReassembler(packet.getPageID(), packet.getSrcIP(), packet.getPageLen(),
+                                    currentTick + MAX_ASSEMBLER_TTL);
 
         if (!reassembler) {
+            packetsInTimedOut++;
             continue;
         }
 
         if (!reassembler->addPacket(packet)) {
-            packetsProcessed++;
+            packetsInDropped++;
             continue;
         }
 
         if (reassembler->isComplete()) {
-            handleCompletedPage(reassembler);
-        }
-
-        packetsProcessed++;
-    }
-
-    return packetsProcessed;
-}
-
-PageReassembler* Terminal::findOrCreateReassembler(int pageID, int pageLength) {
-    for (auto& reassembler : reassemblers) {
-        if (reassembler.pageID == pageID) {
-            if (reassembler.expectedPackets != pageLength) {
-                return nullptr;
-            }
-            return &reassembler;
+            packetsSuccProcessed += reassembler->getTotalPackets();
+            handleCompletedPage(reassembler->getPageID(), reassembler->getSrcIP());
         }
     }
-
-    try {
-        reassemblers.pushBack(PageReassembler(pageID, pageLength));
-        return &reassemblers.getTail();
-    } catch (...) {
-        return nullptr;
-    }
+    return processedCount;
 }
 
-void Terminal::handleCompletedPage(PageReassembler* reassembler) {
-    List<Packet> packets = reassembler->package();
+size_t Terminal::processOutputBuffer(size_t currentTick) {
+    size_t processedCount = 0;
 
+    while (processedCount < outBW && !outBuffer.isEmpty()) {
+        const Packet packet = outBuffer.dequeue();
+
+        if (currentTick >= packet.getTimeout()) {
+            packetsOutTimedOut++;
+            continue;
+        }
+
+        rtrConn->receivePacket(packet);
+        packetsSent++;
+        processedCount++;
+    }
+
+    return processedCount;
+}
+
+void Terminal::tick(size_t currentTick) {
+    updateQuarantine(currentTick);
+    cleanupReassemblers(currentTick);
+
+    processOutputBuffer(currentTick);
+    processInputBuffer(currentTick);
+    generateTraffic(currentTick);
+}
+
+void Terminal::generateTraffic(size_t currentTick) {
+    if (!addressBook || addressBook->isEmpty() || !m_gen) {
+        return;
+    }
+
+    std::bernoulli_distribution decision(trafficProbability);
+    if (!decision(*m_gen)) {
+        return;
+    }
+
+    std::uniform_int_distribution<size_t> indexDist(0, addressBook->size() - 1);
+    const size_t targetIdx = indexDist(*m_gen);
+
+    const IPAddress dest = (*addressBook)[targetIdx];
+
+    if (dest == this->terminalIP) {
+        return;
+    }
+
+    std::uniform_int_distribution<size_t> burstDist(2, maxPageLen);
+    const size_t numPackets = burstDist(*m_gen);
+
+    sendPage(numPackets, dest, currentTick + PACKET_TTL);
+}
+
+PageReassembler* Terminal::findOrCreateReassembler(size_t pageID, IPAddress srcIP,
+                                                   size_t pageLength, size_t timeout) {
+    auto it = std::ranges::find_if(reassemblers, [&](const auto& r) {
+        return (r.getPageID() == pageID) && (r.getSrcIP() == srcIP);
+    });
+
+    if (it != reassemblers.end()) {
+        return (it->getTotalPackets() == pageLength) ? &(*it) : nullptr;
+    }
+
+    return &reassemblers.emplace_back(pageID, srcIP, pageLength, timeout);
+}
+
+void Terminal::handleCompletedPage(size_t pageID, IPAddress srcIP) {
+    auto it = std::ranges::find_if(reassemblers, [&](const auto& r) {
+        return (r.getPageID() == pageID) && (r.getSrcIP() == srcIP);
+    });
+
+    if (it == reassemblers.end()) {
+        return;
+    }
+
+    List<Packet> packets = it->package();
+
+    [[maybe_unused]]
     const Page completedPage(std::move(packets));
 
-    std::cout << "Terminal " << ip << " received page " << completedPage.getPageID() << std::endl;
-
-    receivedPages++;
-
-    removeReassembler(reassembler);
+    pagesCompleted++;
+    reassemblers.erase(it);
 }
 
-void Terminal::removeReassembler(const PageReassembler* reassembler) {
-    for (int i = 0; i < reassemblers.size(); ++i) {
-        if (reassemblers[i] == *reassembler) {
-            reassemblers.removeAt(i);
-            return;
+void Terminal::cleanupReassemblers(size_t currentTick) {
+    std::erase_if(reassemblers, [this, currentTick](const PageReassembler& ra) {
+        if (ra.getTimeout() <= currentTick) {
+            this->pagesTimedOut++;
+            this->packetsInTimedOut += ra.getReceivedPackets();
+            this->quarantine.push_back({ra.getPageID(), currentTick + PACKET_TTL});
+            return true;
         }
-    }
+        return false;
+    });
+}
+
+void Terminal::updateQuarantine(size_t currentTick) {
+    std::erase_if(quarantine,
+                  [currentTick](const QuarantinedID& q) { return q.timeout <= currentTick; });
 }
 
 std::string Terminal::toString() const {
     std::ostringstream oss;
-    oss << "Terminal{IP=" << ip << ", Sent=" << sentPages << ", Received=" << receivedPages
-        << ", Active=" << reassemblers.size() << "}";
+    oss << "Terminal{IP: " << terminalIP << " | Sent: " << pagesSent
+        << ", | Reassembled: " << pagesCompleted << " | Pending: " << reassemblers.size() << "}";
     return oss.str();
 }
 
 std::ostream& operator<<(std::ostream& os, const Terminal& terminal) {
     os << terminal.toString();
     return os;
+}
+
+bool Terminal::isIDQuarantined(size_t id) const {
+    return std::ranges::any_of(
+        quarantine, [id](size_t qID) { return qID == id; }, &QuarantinedID::pageID);
 }

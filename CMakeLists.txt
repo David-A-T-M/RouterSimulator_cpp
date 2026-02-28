@@ -67,3 +67,24 @@ add_custom_target(check
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     COMMENT "Ejecutando Cppcheck exhaustivo..."
 )
+
+find_package(Doxygen)
+
+if (DOXYGEN_FOUND)
+    # Configurar opciones básicas para que chille si falta algo
+    set(DOXYGEN_WARN_AS_ERROR NO)
+    set(DOXYGEN_WARN_LOGFILE "doxygen_warnings.log")
+    set(DOXYGEN_WARN_IF_UNDOCUMENTED YES)
+    set(DOXYGEN_WARN_NO_PARAMDOC YES)
+
+    # Crear el target 'doc'
+    doxygen_add_docs(doc
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ALL # Esto hace que se corra siempre con el build, opcional
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+            COMMENT "Generando documentación y chequeando warnings..."
+    )
+else()
+    message(WARNING "Doxygen no encontrado. No se podrá chequear la documentación.")
+endif()

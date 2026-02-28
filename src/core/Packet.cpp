@@ -1,31 +1,29 @@
 #include "core/Packet.h"
 
-Packet::Packet(int pageID, int pagePosition, int pageLength, int routerPriority, IPAddress destinationIP,
-               IPAddress originIP)
+Packet::Packet(size_t pageID, size_t pagePos, size_t pageLen, IPAddress srcIP, IPAddress dstIP,
+               size_t timeout)
     : pageID(pageID),
-      pagePosition(pagePosition),
-      pageLength(pageLength),
-      routerPriority(routerPriority),
-      destinationIP(destinationIP),
-      originIP(originIP) {
+      pagePos(pagePos),
+      pageLen(pageLen),
+      timeout(timeout),
+      srcIP(srcIP),
+      dstIP(dstIP) {
 
-    if (pagePosition >= pageLength) {
+    if (pagePos >= pageLen) {
         throw std::invalid_argument("pagePosition must be in the range [0, pageLength)");
     }
-    if (!destinationIP.isValid()) {
+    if (!dstIP.isValid()) {
         throw std::invalid_argument("destinationIP must be valid (not 0.0)");
     }
-    if (!originIP.isValid()) {
+    if (!srcIP.isValid()) {
         throw std::invalid_argument("originIP must be valid (not 0.0)");
     }
 }
 
 std::string Packet::toString() const {
     std::ostringstream oss;
-
-    // Format: Dest: RouterIP - ID: PageID(9 digits)-Position
-    // Example: "Dest: 5 - ID: 000000123-4"
-    oss << "Dest: " << destinationIP << " - ID: " << std::setw(9) << std::setfill('0') << pageID << "-" << pagePosition;
+    oss << "Src: " << srcIP << " -> Dst: " << dstIP << " | ID: " << std::setw(6)
+        << std::setfill('0') << pageID << "-" << pagePos << "/" << pageLen;
 
     return oss.str();
 }
