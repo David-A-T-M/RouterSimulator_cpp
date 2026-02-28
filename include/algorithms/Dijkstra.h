@@ -37,7 +37,8 @@ public:
      * @return Routing table for the source router.
      * @throws std::invalid_argument if sourceIP not found.
      */
-    static RoutingTable computeRoutingTable(const List<const Router*>& routers, IPAddress sourceIP);
+    [[nodiscard]] static RoutingTable computeRoutingTable(const List<const Router*>& routers,
+                                                          IPAddress sourceIP);
 
     /**
      * @brief Computes routing tables for all routers in the network.

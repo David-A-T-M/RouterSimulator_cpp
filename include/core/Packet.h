@@ -19,7 +19,7 @@ class Packet {
     size_t pageID;   /**< ID of the page this packet belongs to. */
     size_t pagePos;  /**< Position of this packet within the page. */
     size_t pageLen;  /**< Total number of packets on the page. */
-    size_t expTick;  /**< Simulation tick at which this packet should expire. */
+    size_t timeout;  /**< Simulation tick at which this packet should expire. */
     IPAddress srcIP; /**< Reference to the source terminal IP. */
     IPAddress dstIP; /**< Reference to the destination terminal IP. */
 
@@ -37,13 +37,13 @@ public:
      * @param pageLen Total number of packets in the page (must be > 0).
      * @param srcIP Source terminal IP address.
      * @param dstIP Destination terminal IP address.
-     * @param expTick Simulation tick at which this packet should expire.
+     * @param timeout Simulation tick at which this packet should expire.
      *
      * @throws std::invalid_argument if pagePos is out of range, if pageLen is 0, or if srcIP/dstIP
      * are invalid.
      */
     Packet(size_t pageID, size_t pagePos, size_t pageLen, IPAddress srcIP, IPAddress dstIP,
-           size_t expTick);
+           size_t timeout);
 
     /**
      * @brief Default Copy Constructor.
@@ -115,7 +115,7 @@ public:
      *
      * @return Simulation tick at which this packet should expire and be dropped if not delivered.
      */
-    [[nodiscard]] size_t getExpTick() const noexcept;
+    [[nodiscard]] size_t getTimeout() const noexcept;
 
     // =============== Query Methods ===============
     /**
@@ -137,7 +137,7 @@ public:
      * @brief Gets a string representation of the packet.
      *
      * @return String describing the packet, including pageID, pagePos, pageLen, srcIP, dstIP, and
-     * expTick.
+     * Timeout.
      */
     [[nodiscard]] std::string toString() const;
 
@@ -181,8 +181,8 @@ inline size_t Packet::getPageLen() const noexcept {
     return pageLen;
 }
 
-inline size_t Packet::getExpTick() const noexcept {
-    return expTick;
+inline size_t Packet::getTimeout() const noexcept {
+    return timeout;
 }
 
 inline IPAddress Packet::getDstIP() const noexcept {

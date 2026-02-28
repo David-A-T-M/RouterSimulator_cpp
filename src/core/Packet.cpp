@@ -1,11 +1,11 @@
 #include "core/Packet.h"
 
 Packet::Packet(size_t pageID, size_t pagePos, size_t pageLen, IPAddress srcIP, IPAddress dstIP,
-               size_t expTick)
+               size_t timeout)
     : pageID(pageID),
       pagePos(pagePos),
       pageLen(pageLen),
-      expTick(expTick),
+      timeout(timeout),
       srcIP(srcIP),
       dstIP(dstIP) {
 

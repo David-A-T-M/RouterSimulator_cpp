@@ -560,7 +560,8 @@ List<T>& List<T>::operator=(const List& other) {
 }
 
 template <typename T>
-List<T>::List(List&& other) noexcept : pHead(other.pHead), pTail(other.pTail), nodeCount(other.nodeCount) {
+List<T>::List(List&& other) noexcept
+    : pHead(other.pHead), pTail(other.pTail), nodeCount(other.nodeCount) {
     other.pHead     = nullptr;
     other.pTail     = nullptr;
     other.nodeCount = 0;
