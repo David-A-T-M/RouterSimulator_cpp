@@ -1,6 +1,7 @@
 #pragma once
 
 #include <numeric>
+#include <random>
 #include <vector>
 
 #include "PacketBuffer.h"
@@ -74,7 +75,7 @@ private:
      */
     struct QuarantinedID {
         size_t pageID;  /**< ID of the discarded page */
-        size_t expTick; /**< System tick when this quarantine entry expires */
+        size_t timeout; /**< System tick when this quarantine entry expires */
     };
     /** List of active page reassemblers currently processing incoming packets */
     using AssemblerList   = std::vector<PageReassembler>;
@@ -111,6 +112,11 @@ private:
 
     QuarantinedList quarantine; /**< List of page IDs that are currently quarantined due to expired
                                    reassemblers */
+    List<IPAddress>* addressBook; /**< Pointer to the network's address book */
+    float trafficProbability;     /**< Probability of generating a page in each tick */
+    size_t maxPageLen;            /**< Maximum number of packets in a page for traffic generation */
+    std::mt19937* m_gen;          /**< Random number generator for traffic generation */
+
 public:
     /**
      * @brief Constructor for Terminal.
@@ -160,11 +166,11 @@ public:
      *
      * @param length Number of packets on the page (must be > 0).
      * @param destIP Destination IP address.
-     * @param expTick System tick when the packets should expire.
+     * @param timeout System tick when the packets should expire.
      * @return true if the page was successfully created and enqueued, false if dropped due to
      * insufficient buffer space.
      */
-    bool sendPage(size_t length, IPAddress destIP, size_t expTick);
+    bool sendPage(size_t length, IPAddress destIP, size_t timeout);
 
     /**
      * @brief Receives a packet from the network.
@@ -202,7 +208,15 @@ public:
      */
     void tick(size_t currentTick);
 
-    // =============== Setters ===============
+    /**
+     * @brief Generates traffic by randomly deciding to create and send a page based on the traffic
+     * probability. If a page is generated, it will have a random length up to maxPageLen and a
+     * random destination IP from the address book.
+     *
+     * @param currentTick The current system tick for processing timeouts and expirations.
+     */
+    void generateTraffic(size_t currentTick);
+    //  =============== Setters ===============
     /**
      * @brief Sets external bandwidth.
      *
@@ -216,6 +230,34 @@ public:
      * @param capacity New bandwidth value.
      */
     void setInternalProc(size_t capacity) noexcept;
+
+    /**
+     * @brief Sets the address book pointer for the terminal.
+     *
+     * @param addBook Pointer to the network's address book.
+     */
+    void setAddressBook(List<IPAddress>* addBook) noexcept;
+
+    /**
+     * @brief Sets the random number generator for traffic generation.
+     *
+     * @param gen Pointer to a std::mt19937 random number generator.
+     */
+    void setRandomGenerator(std::mt19937* gen) noexcept;
+
+    /**
+     * @brief Sets the probability of generating traffic in each tick.
+     *
+     * @param probability New traffic generation probability (0.0 to 1.0).
+     */
+    void setTrafficProbability(float probability) noexcept;
+
+    /**
+     * @brief Sets the maximum page length for traffic generation.
+     *
+     * @param pageLen New maximum page length (number of packets).
+     */
+    void setMaxPageLength(size_t pageLen) noexcept;
 
     // =============== Getters ===============
     /**
@@ -345,6 +387,27 @@ public:
     [[nodiscard]] size_t getPacketsInPending() const noexcept;
 
     /**
+     * @brief Gets the probability of generating traffic in each tick.
+     *
+     * @return Traffic generation probability (0.0 to 1.0).
+     */
+    [[nodiscard]] float getTrafficProbability() const noexcept;
+
+    /**
+     * @brief Gets the maximum page length for traffic generation.
+     *
+     * @return Maximum page length (number of packets).
+     */
+    [[nodiscard]] size_t getMaxPageLength() const noexcept;
+
+    /**
+     * @brief Gets a pointer to the random number generator used for traffic generation.
+     *
+     * @return Pointer to the std::mt19937 random number generator.
+     */
+    [[nodiscard]] std::mt19937* getRandomGenerator() const noexcept;
+
+    /**
      * @brief Generates a string representation of the terminal, including its IP address.
      *
      * @return A string representation of the terminal
@@ -367,19 +430,22 @@ private:
      * exist.
      *
      * @param pageID ID of the page being reassembled.
+     * @param srcIP Source IP address of the page being reassembled.
      * @param pageLength Total number of packets expected for the page.
-     * @param expTick System tick when the reassembler should expire.
+     * @param timeout System tick when the reassembler should expire.
      * @return Pointer to the found or created PageReassembler, or nullptr if a reassembler exists
      * but has a different expected page length.
      */
-    PageReassembler* findOrCreateReassembler(size_t pageID, size_t pageLength, size_t expTick);
+    PageReassembler* findOrCreateReassembler(size_t pageID, IPAddress srcIP, size_t pageLength,
+                                             size_t timeout);
 
     /**
      * @brief Handles a completed page by packaging it and updating statistics.
      *
      * @param pageID ID of the completed page.
+     * @param srcIP Source IP address of the completed page.
      */
-    void handleCompletedPage(size_t pageID);
+    void handleCompletedPage(size_t pageID, IPAddress srcIP);
 
     /**
      * @brief Cleans up expired reassemblers and updates statistics and quarantine list accordingly.
@@ -468,6 +534,18 @@ inline size_t Terminal::getPacketsInPending() const noexcept {
     return pending + inBuffer.size();
 }
 
+inline float Terminal::getTrafficProbability() const noexcept {
+    return trafficProbability;
+}
+
+inline size_t Terminal::getMaxPageLength() const noexcept {
+    return maxPageLen;
+}
+
+inline std::mt19937* Terminal::getRandomGenerator() const noexcept {
+    return m_gen;
+}
+
 inline IPAddress Terminal::getTerminalIP() const noexcept {
     return terminalIP;
 }
@@ -486,4 +564,20 @@ inline void Terminal::setExternalBW(size_t bw) noexcept {
 
 inline void Terminal::setInternalProc(size_t capacity) noexcept {
     inProcCap = capacity;
+}
+
+inline void Terminal::setAddressBook(List<IPAddress>* addBook) noexcept {
+    addressBook = addBook;
+}
+
+inline void Terminal::setRandomGenerator(std::mt19937* gen) noexcept {
+    m_gen = gen;
+}
+
+inline void Terminal::setTrafficProbability(float probability) noexcept {
+    trafficProbability = probability;
+}
+
+inline void Terminal::setMaxPageLength(size_t pageLen) noexcept {
+    maxPageLen = pageLen;
 }

@@ -24,16 +24,20 @@ Terminal::Terminal(Router* router, uint8_t terminalID, const Config& cfg)
       packetsInTimedOut(0),
       packetsInDropped(0),
       packetsSuccProcessed(0),
-      nextPageID(0) {
+      nextPageID(0),
+      addressBook(nullptr),
+      trafficProbability(0),
+      maxPageLen(0),
+      m_gen(nullptr) {
     if (terminalID == 0) {
         throw std::invalid_argument("Terminal ID must be greater than 0");
     }
 }
 
-bool Terminal::sendPage(size_t length, IPAddress destIP, size_t expTick) {
+bool Terminal::sendPage(size_t length, IPAddress destIP, size_t timeout) {
     const Page page(nextPageID++, length, terminalIP, destIP);
 
-    List<Packet> packets  = page.toPackets(expTick);
+    List<Packet> packets  = page.toPackets(timeout);
     const auto numPackets = packets.size();
     pagesCreated++;
     packetsGenerated += numPackets;
@@ -75,7 +79,7 @@ size_t Terminal::processInputBuffer(size_t currentTick) {
         Packet packet = inBuffer.dequeue();
         processedCount++;
 
-        if (currentTick >= packet.getExpTick()) {
+        if (currentTick >= packet.getTimeout()) {
             packetsInTimedOut++;
             continue;
         }
@@ -85,8 +89,9 @@ size_t Terminal::processInputBuffer(size_t currentTick) {
             continue;
         }
 
-        PageReassembler* reassembler = findOrCreateReassembler(
-            packet.getPageID(), packet.getPageLen(), currentTick + MAX_ASSEMBLER_TTL);
+        PageReassembler* reassembler =
+            findOrCreateReassembler(packet.getPageID(), packet.getSrcIP(), packet.getPageLen(),
+                                    currentTick + MAX_ASSEMBLER_TTL);
 
         if (!reassembler) {
             packetsInTimedOut++;
@@ -100,7 +105,7 @@ size_t Terminal::processInputBuffer(size_t currentTick) {
 
         if (reassembler->isComplete()) {
             packetsSuccProcessed += reassembler->getTotalPackets();
-            handleCompletedPage(reassembler->getPageID());
+            handleCompletedPage(reassembler->getPageID(), reassembler->getSrcIP());
         }
     }
     return processedCount;
@@ -112,7 +117,7 @@ size_t Terminal::processOutputBuffer(size_t currentTick) {
     while (processedCount < outBW && !outBuffer.isEmpty()) {
         const Packet packet = outBuffer.dequeue();
 
-        if (currentTick >= packet.getExpTick()) {
+        if (currentTick >= packet.getTimeout()) {
             packetsOutTimedOut++;
             continue;
         }
@@ -131,21 +136,51 @@ void Terminal::tick(size_t currentTick) {
 
     processOutputBuffer(currentTick);
     processInputBuffer(currentTick);
+    generateTraffic(currentTick);
 }
 
-PageReassembler* Terminal::findOrCreateReassembler(size_t pageID, size_t pageLength,
-                                                   size_t expTick) {
-    auto it = std::ranges::find(reassemblers, pageID, &PageReassembler::getPageID);
+void Terminal::generateTraffic(size_t currentTick) {
+    if (!addressBook || addressBook->isEmpty() || !m_gen) {
+        return;
+    }
+
+    std::bernoulli_distribution decision(trafficProbability);
+    if (!decision(*m_gen)) {
+        return;
+    }
+
+    std::uniform_int_distribution<size_t> indexDist(0, addressBook->size() - 1);
+    const size_t targetIdx = indexDist(*m_gen);
+
+    const IPAddress dest = (*addressBook)[targetIdx];
+
+    if (dest == this->terminalIP) {
+        return;
+    }
+
+    std::uniform_int_distribution<size_t> burstDist(2, maxPageLen);
+    const size_t numPackets = burstDist(*m_gen);
+
+    sendPage(numPackets, dest, currentTick + PACKET_TTL);
+}
+
+PageReassembler* Terminal::findOrCreateReassembler(size_t pageID, IPAddress srcIP,
+                                                   size_t pageLength, size_t timeout) {
+    auto it = std::ranges::find_if(reassemblers, [&](const auto& r) {
+        return (r.getPageID() == pageID) && (r.getSrcIP() == srcIP);
+    });
 
     if (it != reassemblers.end()) {
         return (it->getTotalPackets() == pageLength) ? &(*it) : nullptr;
     }
 
-    return &reassemblers.emplace_back(pageID, pageLength, expTick);
+    return &reassemblers.emplace_back(pageID, srcIP, pageLength, timeout);
 }
 
-void Terminal::handleCompletedPage(size_t pageID) {
-    auto it = std::ranges::find(reassemblers, pageID, &PageReassembler::getPageID);
+void Terminal::handleCompletedPage(size_t pageID, IPAddress srcIP) {
+    auto it = std::ranges::find_if(reassemblers, [&](const auto& r) {
+        return (r.getPageID() == pageID) && (r.getSrcIP() == srcIP);
+    });
 
     if (it == reassemblers.end()) {
         return;
@@ -162,7 +197,7 @@ void Terminal::handleCompletedPage(size_t pageID) {
 
 void Terminal::cleanupReassemblers(size_t currentTick) {
     std::erase_if(reassemblers, [this, currentTick](const PageReassembler& ra) {
-        if (ra.getExpTick() <= currentTick) {
+        if (ra.getTimeout() <= currentTick) {
             this->pagesTimedOut++;
             this->packetsInTimedOut += ra.getReceivedPackets();
             this->quarantine.push_back({ra.getPageID(), currentTick + PACKET_TTL});
@@ -174,7 +209,7 @@ void Terminal::cleanupReassemblers(size_t currentTick) {
 
 void Terminal::updateQuarantine(size_t currentTick) {
     std::erase_if(quarantine,
-                  [currentTick](const QuarantinedID& q) { return q.expTick <= currentTick; });
+                  [currentTick](const QuarantinedID& q) { return q.timeout <= currentTick; });
 }
 
 std::string Terminal::toString() const {
